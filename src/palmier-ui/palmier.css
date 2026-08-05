@@ -3354,7 +3354,7 @@
 
 .cin {
 	display: grid;
-	grid-template-columns: 168px 1fr;
+	grid-template-columns: 186px 1fr;
 	grid-template-rows: 1fr auto;
 	height: 100%;
 	min-height: 0;
@@ -3386,15 +3386,15 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	gap: 3px;
 	width: 100%;
-	margin-bottom: 5px;
-	padding: 8px 10px;
+	padding: 6px 7px;
 	border: 1px solid var(--pmr-border, #1e2635);
 	border-left: 3px solid var(--tint);
 	border-radius: 7px;
 	background: var(--pmr-bg-raised, #141a26);
 	color: var(--pmr-text, #e6eaf2);
-	font: 500 12px / 1 inherit;
+	font: 500 11px / 1.15 inherit;
 	text-align: left;
 	cursor: grab;
 	transition:
@@ -3444,8 +3444,12 @@
 	border: 1px solid var(--pmr-border, #1e2635);
 	border-radius: 8px;
 }
-.cin__map .react-flow__minimap-mask { fill: rgba(10, 14, 21, 0.72); }
-.cin__map .react-flow__minimap-node { fill: #38445c; }
+.cin__map .react-flow__minimap-mask {
+	fill: rgba(10, 14, 21, 0.72);
+}
+.cin__map .react-flow__minimap-node {
+	fill: #38445c;
+}
 
 /* ── the node ──────────────────────────────────────────────────────── */
 

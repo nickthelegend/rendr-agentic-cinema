@@ -83,6 +83,9 @@ function CinemaNodeCard({ data, selected }: NodeProps & { data: CinemaNodeData }
 	return (
 		<div
 			className="cin-node"
+			// A name a screen reader and a test can both find. Without it the
+			// canvas is a page of anonymous groups.
+			aria-label={`${spec?.label} node${node.label ? `: ${node.label}` : ""} — ${node.status}`}
 			data-selected={selected || undefined}
 			data-status={node.status}
 			style={{ "--tint": tint, "--status": STATUS_TINT[node.status] } as React.CSSProperties}
@@ -252,21 +255,23 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 						<h3 className="cin__group-name" style={{ color: GROUP_TINT[group] }}>
 							{group}
 						</h3>
-						{NODE_SPECS.filter((spec) => spec.group === group).map((spec) => (
-							<button
-								key={spec.kind}
-								type="button"
-								className="cin__add"
-								title={spec.summary}
-								draggable
-								onDragStart={() => setDropKind(spec.kind)}
-								onClick={() => addNode(spec.kind)}
-								style={{ "--tint": GROUP_TINT[group] } as React.CSSProperties}
-							>
-								{spec.label}
-								{spec.generative ? <span className="cin__spark">◆</span> : null}
-							</button>
-						))}
+						<div className="cin__group-items">
+							{NODE_SPECS.filter((spec) => spec.group === group).map((spec) => (
+								<button
+									key={spec.kind}
+									type="button"
+									className="cin__add"
+									title={spec.summary}
+									draggable
+									onDragStart={() => setDropKind(spec.kind)}
+									onClick={() => addNode(spec.kind)}
+									style={{ "--tint": GROUP_TINT[group] } as React.CSSProperties}
+								>
+									{spec.label}
+									{spec.generative ? <span className="cin__spark">◆</span> : null}
+								</button>
+							))}
+						</div>
 					</section>
 				))}
 			</aside>
