@@ -8,6 +8,7 @@
 // Video clips draw their real decoded frame, seeked to the playhead.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { can } from "@/config/capabilities";
 import {
 	backgroundCss,
 	DEFAULT_BACKGROUND,
@@ -677,19 +678,22 @@ export function PreviewPanel({
 					</span>
 					<span className="pmr-blank__title">Nothing on the timeline</span>
 					<span className="pmr-blank__body">
-						Record your screen or bring in a file, then drop it on a track to see it
-						here.
+						{can("recording")
+							? "Record your screen or bring in a file, then drop it on a track to see it here."
+							: "Build a film in the graph, or bring in a file, then drop it on a track to see it here."}
 					</span>
-					<div className="pmr-blank__actions">
-						<button
-							type="button"
-							className="pmr-action pmr-action--record"
-							onClick={onRecordClick}
-						>
-							<RecordIcon size={11} />
-							Record screen
-						</button>
-					</div>
+					{can("recording") ? (
+						<div className="pmr-blank__actions">
+							<button
+								type="button"
+								className="pmr-action pmr-action--record"
+								onClick={onRecordClick}
+							>
+								<RecordIcon size={11} />
+								Record screen
+							</button>
+						</div>
+					) : null}
 				</div>
 			) : (
 				<div className="pmr-preview">

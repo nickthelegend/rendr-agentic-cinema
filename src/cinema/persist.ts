@@ -70,3 +70,66 @@ export function freshGraphId(): string {
 export function emptyGraph(name = "Untitled film"): CinemaGraph {
 	return { id: freshGraphId(), name, nodes: [], edges: [], auto: false };
 }
+
+/**
+ * What "New Film" creates.
+ *
+ * Not empty. An empty canvas teaches nothing about what the nodes do, and a
+ * film cannot produce anything without at least a character, a story and
+ * somewhere for the scenes to land — so those three arrive wired, and the
+ * first thing anyone does is type into them rather than guess at the palette.
+ */
+export function starterGraph(name = "Untitled film"): CinemaGraph {
+	const id = freshGraphId();
+	const node = (
+		kind: CinemaNode["kind"],
+		x: number,
+		y: number,
+		extra: Partial<CinemaNode> = {},
+	): CinemaNode => ({
+		id: `${id}-${kind}`,
+		kind,
+		x,
+		y,
+		params: {},
+		status: "idle",
+		...extra,
+	});
+
+	const nodes: CinemaNode[] = [
+		node("character", 60, 40, { label: "Lead" }),
+		node("world", 60, 210),
+		node("beat", 60, 350, { label: "Opening beat" }),
+		node("story", 320, 180, { params: { targetSeconds: 30 } }),
+		{ ...node("scene", 570, 100, { label: "Shot 1" }), id: `${id}-scene` },
+		{
+			...node("scene", 570, 260, { label: "Shot 2" }),
+			id: `${id}-scene2`,
+			params: { sceneIndex: 1 },
+		},
+		node("timeline", 810, 180),
+	];
+	const wire = (from: string, to: string) => ({
+		id: `${id}-e-${from}-${to}`,
+		from: `${id}-${from}`,
+		to: `${id}-${to}`,
+	});
+
+	return {
+		id,
+		name,
+		auto: false,
+		nodes,
+		// Two scenes rather than one: a single scene hides the thing the graph is
+		// for, which is the same face turning up twice.
+		edges: [
+			wire("character", "story"),
+			wire("world", "story"),
+			wire("beat", "story"),
+			wire("story", "scene"),
+			wire("story", "scene2"),
+			wire("scene", "timeline"),
+			wire("scene2", "timeline"),
+		],
+	};
+}

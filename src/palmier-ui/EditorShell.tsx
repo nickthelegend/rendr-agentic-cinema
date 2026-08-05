@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./palmier.css";
 
 import type { CursorTelemetryPoint } from "@/components/video-editor/types";
+import { can } from "@/config/capabilities";
 import { CinemaPanel } from "../cinema/CinemaPanel";
 import { autoZoomRegions } from "./autoZoom";
 import { DEFAULT_BACKGROUND } from "./background";
@@ -151,16 +152,18 @@ function Titlebar({
 				<SparkleIcon size={12} />
 			</button>
 
-			<button
-				type="button"
-				className="pmr-action pmr-action--record"
-				onClick={onRecordClick}
-				disabled={recording}
-				style={{ marginLeft: 4 }}
-			>
-				<RecordIcon size={10} />
-				Record
-			</button>
+			{can("recording") ? (
+				<button
+					type="button"
+					className="pmr-action pmr-action--record"
+					onClick={onRecordClick}
+					disabled={recording}
+					style={{ marginLeft: 4 }}
+				>
+					<RecordIcon size={10} />
+					Record
+				</button>
+			) : null}
 		</div>
 	);
 }

@@ -2,10 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "rendr-ui",
+      "name": "cinema-ui",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--config", "vite.ui.config.ts"],
-      "port": 5199
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "vite.ui.config.ts"
+      ],
+      "port": 5233
     }
   ]
 }

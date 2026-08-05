@@ -6,6 +6,7 @@
 // in — drop a file, record the screen, or ask the agent.
 
 import { useCallback, useRef, useState } from "react";
+import { can } from "@/config/capabilities";
 import { captionGroups } from "../captions";
 import {
 	CameraIcon,
@@ -224,14 +225,16 @@ export function MediaPanel({ api, onRecordClick }: { api: EditorApi; onRecordCli
 										<ImportIcon size={12} />
 										Import files
 									</button>
-									<button
-										type="button"
-										className="pmr-action pmr-action--record"
-										onClick={onRecordClick}
-									>
-										<RecordIcon size={11} />
-										Record screen
-									</button>
+									{can("recording") ? (
+										<button
+											type="button"
+											className="pmr-action pmr-action--record"
+											onClick={onRecordClick}
+										>
+											<RecordIcon size={11} />
+											Record screen
+										</button>
+									) : null}
 									<button
 										type="button"
 										className="pmr-action"

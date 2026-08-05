@@ -6,7 +6,7 @@
 // through a toast rather than sitting in the menu looking available.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
+import { starterGraph } from "../cinema/persist";
 import { toFcpxml, toXmeml } from "./interchange";
 import { splitAt } from "./reducers";
 import type { EditorApi } from "./state";
@@ -83,6 +83,29 @@ export function MenuBar({
 						api.newProject();
 					},
 				},
+				{
+					label: "New Film…",
+					action: () =>
+						api.askFor({
+							title: "New film",
+							label: "Name",
+							initialValue: "Untitled film",
+							confirmLabel: "Create",
+							// Seeded rather than empty: an empty canvas teaches
+							// nothing about what the nodes do, and every film needs
+							// these three to produce anything at all.
+							onConfirm: (name) => api.addCinemaGraph(starterGraph(name)),
+						}),
+				},
+				{
+					label: state.activeCinemaGraphId ? "Back to Timeline" : "Films…",
+					disabled: !state.activeCinemaGraphId && state.cinemaGraphs.length === 0,
+					action: () =>
+						api.setActiveCinemaGraph(
+							state.activeCinemaGraphId ? null : (state.cinemaGraphs[0]?.id ?? null),
+						),
+				},
+				{ separator: true, label: "" },
 				{
 					label: "New Workflow…",
 					action: () =>

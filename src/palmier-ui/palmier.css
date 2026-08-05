@@ -3434,11 +3434,18 @@
 .cin__canvas .react-flow__edge.selected .react-flow__edge-path {
 	stroke: var(--pmr-accent, #ff9f3d);
 }
+/* Sized explicitly. React Flow's default minimap scales with the pane, which
+   in a short editor pane means it swallows a third of the canvas — and its
+   default mask renders light, so it reads as a hole rather than a map. */
 .cin__map {
-	background: var(--pmr-bg-raised, #141a26) !important;
+	width: 132px !important;
+	height: 84px !important;
+	background: var(--pmr-bg-sunken, #0c0f16) !important;
 	border: 1px solid var(--pmr-border, #1e2635);
 	border-radius: 8px;
 }
+.cin__map .react-flow__minimap-mask { fill: rgba(10, 14, 21, 0.72); }
+.cin__map .react-flow__minimap-node { fill: #38445c; }
 
 /* ── the node ──────────────────────────────────────────────────────── */
 
