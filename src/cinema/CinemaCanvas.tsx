@@ -78,7 +78,13 @@ function CinemaNodeCard({ data, selected }: NodeProps & { data: CinemaNodeData }
 	const { node, issue, onOpen } = data;
 	const spec = nodeSpec(node.kind);
 	const tint = GROUP_TINT[spec?.group ?? "ingredient"];
-	const thumb = node.output?.sheetAssetIds?.[0] ?? node.output?.assetIds?.[0];
+	// The bytes, not an asset id. sheetAssetIds is for media that has been
+	// imported into the library, which happens at timeline-commit time — long
+	// after the node has something to show. Reading it here meant a node
+	// finished, went green, and displayed nothing, which is the one thing the
+	// inline preview exists to prevent.
+	const sheet = node.output?.sheet?.[0];
+	const thumb = sheet ? `data:${sheet.mimeType};base64,${sheet.base64}` : undefined;
 
 	return (
 		<div

@@ -31,8 +31,16 @@ export interface RunOptions {
 	only?: string[];
 	/** Re-run even nodes that are already ready. */
 	force?: boolean;
-	/** Called as each node changes state, so the canvas can redraw live. */
-	onProgress?: (nodeId: string, status: NodeStatus, note?: string) => void;
+	/**
+	 * Called as each node changes state, with the graph as it now stands.
+	 *
+	 * The graph is passed rather than left to the caller to rebuild. A caller
+	 * holding the graph from before the run and patching one status into it
+	 * discards every output accumulated so far — which is exactly what happened:
+	 * a completed run left every node reading "idle" because the last progress
+	 * tick reset it to the starting state.
+	 */
+	onProgress?: (nodeId: string, status: NodeStatus, graph: CinemaGraph) => void;
 	/**
 	 * Every generative call, for the ledger. Called whether the node succeeded
 	 * or failed — a rejected take is the most useful row in the table.
@@ -119,7 +127,7 @@ export async function runGraph(
 				node.id === nodeId ? { ...node, status, ...patch } : node,
 			),
 		};
-		options.onProgress?.(nodeId, status);
+		options.onProgress?.(nodeId, status, graph);
 	};
 
 	for (const step of order) {
@@ -155,7 +163,8 @@ export async function runGraph(
 						: entry,
 				),
 			};
-			options.onProgress?.(node.id, "ready");
+			// After the graph above was rebuilt, so the tick carries the output.
+			options.onProgress?.(node.id, "ready", graph);
 			ran.push(node.id);
 			options.onRecord?.({
 				nodeId: node.id,

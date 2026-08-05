@@ -130,18 +130,12 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					only,
 					// Progress is written straight back to the graph, so the canvas
 					// shows a node going running → ready while the rest still wait.
-					onProgress: (nodeId, status) =>
-						api.updateCinemaGraph(
-							{
-								...graph,
-								nodes: graph.nodes.map((node) =>
-									node.id === nodeId ? { ...node, status } : node,
-								),
-							},
-							// Status ticks are not edits. Recording them would bury
-							// every real change under a dozen of these.
-							{ undoable: false },
-						),
+					// Commit exactly what the runner has, not a patch onto the
+					// graph this closure captured — that one is from before the
+					// run and using it throws away every output so far.
+					onProgress: (_nodeId, _status, live) =>
+						// Status ticks are not edits, so they stay out of undo.
+						api.updateCinemaGraph(live, { undoable: false }),
 				});
 				api.updateCinemaGraph(report.graph);
 				for (const line of report.continuity.slice(0, 3)) notice(line);
