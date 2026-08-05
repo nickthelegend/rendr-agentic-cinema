@@ -213,8 +213,9 @@ export function MediaPanel({ api, onRecordClick }: { api: EditorApi; onRecordCli
 								</span>
 								<span className="pmr-blank__title">No media yet</span>
 								<span className="pmr-blank__body">
-									Drop files here, record your screen, or ask the agent to bring
-									something in.
+									{can("recording")
+										? "Drop files here, record your screen, or ask the agent to bring something in."
+										: "Drop files here, or build a film in the graph and its scenes will land in the library."}
 								</span>
 								<div className="pmr-blank__actions">
 									<button

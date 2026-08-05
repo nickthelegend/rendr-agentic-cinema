@@ -6,6 +6,7 @@
 // server in the main process; nothing here fabricates a conversation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { can } from "@/config/capabilities";
 import { SendIcon, SparkleIcon } from "../icons";
 import { MCP_PORT } from "../mcpStatus";
 import { PanelHeader } from "../Panel";
@@ -19,11 +20,24 @@ const STATUS_COLOR: Record<string, string> = {
 	pending: Status.warning,
 };
 
-const SUGGESTIONS = [
-	"Record my screen, then punch in wherever I click",
-	"Tighten the pacing and drop the filler words",
-	"Add a title card and warm the grade",
-];
+/**
+ * What to offer the agent, per build.
+ *
+ * The recording suggestion is the first thing anyone clicks, and in a build
+ * with no recorder it teaches the wrong thing about what the app is for. The
+ * cinema set leads with the cast, because that is where a film starts here.
+ */
+const SUGGESTIONS = can("recording")
+	? [
+			"Record my screen, then punch in wherever I click",
+			"Tighten the pacing and drop the filler words",
+			"Add a title card and warm the grade",
+		]
+	: [
+			"Build me a cast of two and a story about a missed train",
+			"Break this story into six shots and render them",
+			"Add a title card and warm the grade",
+		];
 
 export function AgentPanel({ api }: { api: EditorApi }) {
 	const { state, toast } = api;
