@@ -88,10 +88,32 @@ export interface Ledger {
 	record(row: LedgerRow): Promise<void>;
 	/** Takes already tried for a node, newest first. */
 	takesFor(graphId: string, nodeId: string): Promise<LedgerRow[]>;
-	/** Prompt fragments that most often produced accepted shots. */
-	whatWorks(graphId?: string): Promise<Array<{ model: string; accepted: number; total: number }>>;
+	/**
+	 * The prompts that most often produced kept shots.
+	 *
+	 * Grouped by prompt rather than by model, which is what it grouped by first
+	 * and what made it useless: there is one image model, so ranking models
+	 * ranks a list of one. The question worth asking across a session is which
+	 * phrasing survived, and that is a prompt-level question.
+	 */
+	whatWorks(
+		graphId?: string,
+	): Promise<Array<{ prompt: string; model: string; accepted: number; total: number }>>;
 	/** What this film has cost so far, for the auto-mode spend ceiling. */
 	spentOn(graphId: string): Promise<{ calls: number; costUsd: number }>;
+	/**
+	 * Marks one take kept or discarded.
+	 *
+	 * The judgement is what makes the rest of the table mean anything: without
+	 * it every row is "a call happened", and no query can tell a prompt that
+	 * works from one that merely returns.
+	 *
+	 * Addressed by its exact timestamp rather than "the latest for this node",
+	 * because the latest is a moving target — a run that finishes between
+	 * looking at a take and judging it would silently redirect the verdict onto
+	 * a different picture.
+	 */
+	judge(graphId: string, nodeId: string, at: string, accepted: boolean): Promise<void>;
 }
 
 /**
@@ -213,9 +235,20 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 		},
 
 		async whatWorks(graphId) {
-			const scope = graphId ? `WHERE graph_id = '${escape(graphId)}'` : "";
+			// Scoped to successful calls: a prompt that never returned an image
+			// cannot have produced a kept one, and letting failures into the
+			// denominator makes a good prompt that once hit a quota wall look
+			// worse than a mediocre one that ran on a quiet afternoon.
+			const scope = graphId ? `AND graph_id = '${escape(graphId)}'` : "";
 			const text = await run(
-				`SELECT model, countIf(accepted = 1) AS accepted, count() AS total FROM ${TABLE} ${scope} GROUP BY model ORDER BY accepted DESC`,
+				`SELECT prompt, any(model) AS model, countIf(accepted = 1) AS accepted, count() AS total ` +
+					// Empty prompts excluded. A leaderboard row with nothing written
+					// on it ranks a phrasing nobody can read or reuse, and one showed
+					// up the moment this shipped — the story node was recording a
+					// blank. That is fixed at the source too; this keeps any future
+					// blank out of a list whose whole value is being readable.
+					`FROM ${TABLE} WHERE ok = 1 AND prompt != '' ${scope} GROUP BY prompt ` +
+					`HAVING accepted > 0 ORDER BY accepted DESC, total ASC LIMIT 12`,
 				"JSONEachRow",
 			);
 			return text
@@ -224,11 +257,28 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 				.map((line) => {
 					const raw = JSON.parse(line) as Record<string, unknown>;
 					return {
+						prompt: String(raw.prompt ?? ""),
 						model: String(raw.model ?? ""),
 						accepted: Number(raw.accepted ?? 0),
 						total: Number(raw.total ?? 0),
 					};
 				});
+		},
+
+		async judge(graphId, nodeId, at, accepted) {
+			// A flat predicate on literals, deliberately. ClickHouse mutations do
+			// not accept a subquery in the WHERE, so "the most recent take for
+			// this node" cannot be expressed here at all — the caller passes the
+			// row's own timestamp, which is more precise anyway.
+			//
+			// The verdict is applied optimistically in the UI: a mutation is
+			// asynchronous, so reading the table straight back would show the old
+			// value and look like the click did nothing.
+			await run(
+				`ALTER TABLE ${TABLE} UPDATE accepted = ${accepted ? 1 : 0} ` +
+					`WHERE graph_id = '${escape(graphId)}' AND node_id = '${escape(nodeId)}' ` +
+					`AND at = '${escape(at)}'`,
+			);
 		},
 
 		async spentOn(graphId) {

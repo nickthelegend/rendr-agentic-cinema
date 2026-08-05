@@ -172,6 +172,12 @@ export async function runGraph(
 				nodeId: node.id,
 				kind: node.kind,
 				model: output.model,
+				// The prompt is what the ledger exists to hold. Without it a row
+				// records that something happened and nothing about what was
+				// asked, which answers neither question the table is for. A scene
+				// carries the assembled prompt out of the render; every other kind
+				// was asked its own text.
+				prompt: output.prompt ?? node.text ?? "",
 				seed: output.seed,
 				elapsedMs: Date.now() - at,
 				ok: true,
@@ -190,9 +196,16 @@ export async function runGraph(
 			options.onRecord?.({
 				nodeId: node.id,
 				kind: node.kind,
+				// The failures are the most useful rows in the table — a ledger of
+				// only successes cannot answer "why does this keep getting
+				// blocked". Recording the prompt beside the classification is what
+				// makes that answerable: "safety" plus the wording that tripped it
+				// is actionable, and either one alone is not.
+				prompt: node.text ?? "",
 				elapsedMs: Date.now() - at,
 				ok: false,
 				error: message,
+				errorKind: error instanceof ProviderError ? error.kind : undefined,
 			});
 		}
 	}
@@ -271,6 +284,7 @@ async function runNode(
 			text: `${result.scenes.length} scenes`,
 			model: result.model,
 			elapsedMs: result.elapsedMs,
+			prompt: result.prompt,
 		};
 	}
 

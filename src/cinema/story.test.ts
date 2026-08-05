@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { CinemaNode, SceneSpec } from "./nodes";
-import { castFrom, checkContinuity, parseScenes } from "./story";
+import type { CinemaProvider } from "./provider";
+import { castFrom, checkContinuity, decomposeStory, parseScenes } from "./story";
 
 const input = {
 	beats: [
@@ -240,5 +241,43 @@ describe("castFrom", () => {
 			{ id: "c1", name: "Character 1" },
 			{ id: "c2", name: "Mira" },
 		]);
+	});
+});
+
+describe("what the story tells the ledger", () => {
+	it("carries the prompt it actually sent", async () => {
+		// It did not, at first, and the leaderboard made it obvious: a ranked
+		// entry with nothing written on it, sitting between two readable ones.
+		const answered: CinemaProvider = {
+			name: "fake",
+			text: async () => ({
+				text: JSON.stringify({
+					scenes: [
+						{
+							characterNames: ["Lead"],
+							location: "a platform",
+							timeOfDay: "night",
+							camera: "wide",
+							action: "the train leaves",
+							durationSeconds: 4,
+						},
+					],
+				}),
+				model: "fake-text",
+				elapsedMs: 1,
+			}),
+			image: async () => {
+				throw new Error("not used");
+			},
+		};
+		const result = await decomposeStory(answered, {
+			beats: [{ id: "b1", text: "she misses the last train" }],
+			cast: [{ name: "Lead", description: "a dock worker" }],
+			world: "a rain-dark port town",
+		});
+
+		expect(result.prompt).toContain("she misses the last train");
+		expect(result.prompt).toContain("Lead");
+		expect(result.prompt).toContain("rain-dark port town");
 	});
 });

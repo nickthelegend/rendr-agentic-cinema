@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { CinemaGraph, CinemaNode } from "./nodes";
 import type { CinemaProvider } from "./provider";
 import { ProviderError } from "./provider";
-import { estimateRun, markStale, needsRun, runGraph, sceneOrdinal } from "./run";
+import { estimateRun, type LedgerEntry, markStale, needsRun, runGraph, sceneOrdinal } from "./run";
 
 const node = (
 	id: string,
@@ -323,5 +323,53 @@ describe("sceneOrdinal", () => {
 		]);
 		expect(sceneOrdinal(g, g.nodes[1])).toBe(0);
 		expect(sceneOrdinal(g, g.nodes[0])).toBe(1);
+	});
+});
+
+describe("what the ledger is told", () => {
+	// A regression guard with a scar. The prompt column shipped empty: LedgerEntry
+	// had the field, the panel forwarded it, and the runner never filled it in —
+	// so every row recorded that a call happened and nothing about what was
+	// asked, which is the one thing the table exists for. The suite never saw it
+	// because nothing asserted on an entry's contents, only that one arrived.
+	const cast = () =>
+		graph(
+			[
+				node("c", "character", { text: "a dock worker in her fifties" }),
+				node("w", "world", { text: "coastal Kerala, monsoon" }),
+				node("s", "story", { text: "she misses the last train" }),
+			],
+			[
+				["c", "s"],
+				["w", "s"],
+			],
+		);
+
+	it("records the prompt, not just that something ran", async () => {
+		const entries: LedgerEntry[] = [];
+		await runGraph(provider(), cast(), { onRecord: (entry) => entries.push(entry) });
+
+		expect(entries.length).toBeGreaterThan(0);
+		for (const entry of entries) {
+			expect(entry.prompt, `${entry.kind} recorded an empty prompt`).toBeTruthy();
+		}
+	});
+
+	it("classifies a failure so 'wait' stays distinct from 'reword it'", async () => {
+		const entries: LedgerEntry[] = [];
+		const angry = provider({
+			text: async () => {
+				throw new ProviderError("blocked", "safety");
+			},
+			image: async () => {
+				throw new ProviderError("blocked", "safety");
+			},
+		});
+		await runGraph(angry, cast(), { onRecord: (entry) => entries.push(entry) });
+
+		const bad = entries.filter((entry) => !entry.ok);
+		expect(bad.length).toBeGreaterThan(0);
+		expect(bad[0].errorKind).toBe("safety");
+		expect(bad[0].prompt).toBeTruthy();
 	});
 });

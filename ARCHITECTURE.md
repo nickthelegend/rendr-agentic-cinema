@@ -208,17 +208,22 @@ accepts our request shape:
 - "To timeline" puts the rendered scenes on V1 as clips with camera moves, and
   the project duration matches what the story asked for.
 
+Then, driving it against a local server speaking the Clickhouse wire protocol:
+
+- A run writes five rows, and the prompt column carries what was actually
+  asked — it shipped empty, and only a real INSERT showed it.
+- Keep sets `accepted = 1`, the verdict survives a re-read, and the take reads
+  "kept".
+- With nothing selected, the leaderboard lists five prompts with their keep
+  counts and the film's call total.
+- With the ledger process killed, the panel still renders and the render still
+  runs — bookkeeping never takes a shot down with it.
+
 `Test connection` covers the rest, and needs a key.
 
 ## Known, found by driving the app
 
 Kept here rather than in a commit message, because these are open.
-
-**Node cards left the accessibility tree.** They appeared as anonymous `group`
-entries before the aria-label was added and do not appear at all after it,
-which suggests the label went somewhere the tree does not read. A canvas whose
-nodes cannot be found by name is a canvas that cannot be tested without pixel
-coordinates.
 
 **Reloading loses the graph.** Cinema graphs live in memory until the project
 is saved, so a refresh during development starts over. Fine for a save-backed
@@ -228,8 +233,12 @@ app, surprising while iterating.
 the stub. `npm run preflight`, or the Test connection button, is the check that
 closes this — both need a key.
 
-**Half the ledger is read back.** A node's previous takes show in the
-inspector — what was tried, when, and why it failed. `whatWorks` (the prompt
-leaderboard) and `spentOn` (the auto-mode spend ceiling) still have no UI, and
-`accepted` is never set because nothing offers a keep-or-discard yet. Without
-that, the leaderboard has nothing to rank.
+**The ledger reads back.** Both queries it was argued for now have a UI: a
+node's previous takes in the inspector, and — once nothing is selected — the
+prompts that produced kept shots, ranked, with the film's running call count
+under them. Keep/Discard on each take is what feeds the second one; without a
+verdict every row is "a call happened" and the leaderboard ranks nulls.
+
+`spentOn` is displayed but not yet *enforced*. The auto-mode spend ceiling
+described above still needs the debounce and the confirm-above-threshold; the
+number it would read is now on screen, which is the smaller half of that job.

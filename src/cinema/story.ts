@@ -82,6 +82,15 @@ export interface DecomposeResult {
 	elapsedMs: number;
 	/** Names the model used that are not in the cast. */
 	unknownCharacters: string[];
+	/**
+	 * What was actually sent.
+	 *
+	 * Carried out for the ledger, the same way a scene render carries its
+	 * assembled prompt. Without it the story node recorded a row with an empty
+	 * prompt — visible the moment the leaderboard shipped, as a ranked entry
+	 * with nothing written on it.
+	 */
+	prompt: string;
 }
 
 export async function decomposeStory(
@@ -113,7 +122,12 @@ export async function decomposeStory(
 		temperature: 0.7,
 	});
 
-	return { ...parseScenes(result.text, input), model: result.model, elapsedMs: result.elapsedMs };
+	return {
+		...parseScenes(result.text, input),
+		model: result.model,
+		elapsedMs: result.elapsedMs,
+		prompt,
+	};
 }
 
 /**

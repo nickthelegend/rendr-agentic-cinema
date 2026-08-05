@@ -147,3 +147,110 @@ describe("queries", () => {
 		expect(await ledger.spentOn("g1")).toEqual({ calls: 0, costUsd: 0 });
 	});
 });
+
+describe("judge", () => {
+	it("addresses one row by its exact timestamp", async () => {
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.judge("g1", "n1", "2026-08-06 11:02:03.400", true);
+		expect(sent[0]).toContain("UPDATE accepted = 1");
+		expect(sent[0]).toContain("node_id = 'n1'");
+		expect(sent[0]).toContain("at = '2026-08-06 11:02:03.400'");
+	});
+
+	it("never uses a subquery, which mutations reject", async () => {
+		// The predicate has to be flat literals. ClickHouse refuses a SELECT
+		// inside an ALTER ... UPDATE, so "the newest take for this node" cannot be
+		// expressed here at all — a version that reads well and throws on a real
+		// server is worse than none.
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.judge("g1", "n1", "2026-08-06 11:02:03.400", false);
+		expect(sent[0]).not.toContain("SELECT");
+		expect(sent[0]).toContain("UPDATE accepted = 0");
+	});
+
+	it("escapes a graph id containing a quote", async () => {
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.judge("o'brien", "n1", "2026-08-06 11:02:03.400", true);
+		expect(sent[0]).toContain("graph_id = 'o\\'brien'");
+	});
+
+	it("a verdict that fails to save rejects, so the UI can revert it", async () => {
+		const { ledger } = ledgerWith(() => ({ ok: false, text: "read only" }));
+		await expect(ledger.judge("g1", "n1", "2026-08-06 11:02:03.400", true)).rejects.toThrow(
+			/500/,
+		);
+	});
+});
+
+describe("whatWorks", () => {
+	// This query had no test at all, which is how it survived being wrong: it
+	// grouped by model, and there is one image model, so the "prompt
+	// leaderboard" was a ranked list of length one that never mentioned a
+	// prompt.
+	it("ranks prompts, not models", async () => {
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.whatWorks("g1");
+		expect(sent[0]).toContain("GROUP BY prompt");
+		expect(sent[0]).not.toContain("GROUP BY model");
+	});
+
+	it("counts only calls that returned", async () => {
+		// A prompt that never produced an image cannot have produced a kept one,
+		// and letting failures into the denominator makes a good prompt that once
+		// hit a quota wall score worse than a mediocre one that ran on a quiet
+		// afternoon.
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.whatWorks("g1");
+		expect(sent[0]).toContain("ok = 1");
+		expect(sent[0]).toContain("HAVING accepted > 0");
+	});
+
+	it("scopes to one film when asked, and across films when not", async () => {
+		const { ledger, sent } = ledgerWith(() => ({ ok: true, text: "" }));
+		await ledger.whatWorks("g1");
+		await ledger.whatWorks();
+		expect(sent[0]).toContain("graph_id = 'g1'");
+		expect(sent[1]).not.toContain("graph_id");
+	});
+
+	it("reads the rows back", async () => {
+		const { ledger } = ledgerWith(() => ({
+			ok: true,
+			text: [
+				JSON.stringify({
+					prompt: "wide establishing, static",
+					model: "gemini-3.1-flash-image",
+					accepted: 3,
+					total: 4,
+				}),
+				JSON.stringify({ prompt: "close on hands", model: "x", accepted: 1, total: 1 }),
+			].join("\n"),
+		}));
+		const rows = await ledger.whatWorks("g1");
+		expect(rows).toHaveLength(2);
+		expect(rows[0].prompt).toBe("wide establishing, static");
+		expect(rows[0].accepted).toBe(3);
+		expect(rows[0].total).toBe(4);
+	});
+});
+
+describe("spentOn", () => {
+	it("reports zero for a film that has run nothing", async () => {
+		// The auto-mode spend ceiling reads this. A film with no rows must come
+		// back as zero rather than NaN, or the first comparison against a budget
+		// is false and the guard opens.
+		const { ledger } = ledgerWith(() => ({ ok: true, text: "" }));
+		expect(await ledger.spentOn("g1")).toEqual({ calls: 0, costUsd: 0 });
+	});
+
+	it("treats a null cost sum as zero", async () => {
+		// Clickhouse returns NULL for sum() over no non-null values, and
+		// Number(null) is 0 but Number(undefined) is NaN — worth pinning, because
+		// a NaN ceiling compares false against everything.
+		const { ledger } = ledgerWith(() => ({
+			ok: true,
+			text: JSON.stringify({ calls: 5, cost: null }),
+		}));
+		expect(await ledger.spentOn("g1")).toEqual({ calls: 5, costUsd: 0 });
+	});
+});

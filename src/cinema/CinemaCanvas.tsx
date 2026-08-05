@@ -135,7 +135,9 @@ const NODE_TYPES = { cinema: CinemaNodeCard as never };
 export interface CinemaCanvasProps {
 	graph: CinemaGraph;
 	onChange: (next: CinemaGraph) => void;
-	onOpenNode: (nodeId: string) => void;
+	/** null clears the selection, which is how the inspector gets back to
+	 *  its overview. */
+	onOpenNode: (nodeId: string | null) => void;
 	/** Shown as a toast — refusals go here rather than being swallowed. */
 	onNotice: (message: string, tone?: "error" | "info") => void;
 }
@@ -350,6 +352,17 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 					onNodesChange={onNodesChange}
 					onEdgesChange={onEdgesChange}
 					onNodeDragStop={commitPositions}
+					// A single click opens the node. Double-click was the only way
+					// in at first, which meant the inspector sat on "nothing
+					// selected" through an entire render while the obvious gesture
+					// did nothing — React Flow spends the double-click on zooming
+					// the pane, so it never even reached the card underneath.
+					onNodeClick={(_event, clicked) => onOpenNode(clicked.id)}
+					// Clicking the empty canvas deselects. Without it there was no
+					// way back to the empty inspector once anything was picked,
+					// which quietly made the whole overview it shows — the prompt
+					// leaderboard and the running spend — unreachable.
+					onPaneClick={() => onOpenNode(null)}
 					onConnect={onConnect}
 					onEdgesDelete={(gone) =>
 						onChange({

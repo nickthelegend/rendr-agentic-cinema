@@ -9,6 +9,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { Ledger, LedgerRow } from "./ledger";
+
+type PromptScore = Awaited<ReturnType<Ledger["whatWorks"]>>[number];
+
 import type { CinemaGraph, CinemaNode } from "./nodes";
 import { nodeSpec } from "./nodes";
 import { markStale } from "./run";
@@ -34,6 +37,33 @@ export function CinemaInspector({
 	onNotice,
 }: CinemaInspectorProps) {
 	const [takes, setTakes] = useState<LedgerRow[] | null>(null);
+	const [works, setWorks] = useState<PromptScore[] | null>(null);
+	const [spend, setSpend] = useState<{ calls: number; costUsd: number } | null>(null);
+	const node = graph.nodes.find((entry) => entry.id === nodeId);
+
+	/**
+	 * The leaderboard and the running total, loaded only when nothing is
+	 * selected.
+	 *
+	 * Two aggregates over the whole film, so they are not worth running on every
+	 * node click — and the empty inspector is the only place they are shown.
+	 */
+	useEffect(() => {
+		if (!ledger || nodeId) return;
+		let live = true;
+		void Promise.all([ledger.whatWorks(graph.id), ledger.spentOn(graph.id)])
+			.then(([leaders, total]) => {
+				if (!live) return;
+				setWorks(leaders);
+				setSpend(total);
+			})
+			// Same rule as the take history: a panel that cannot load its extras
+			// still has to render the thing it is actually for.
+			.catch(() => {});
+		return () => {
+			live = false;
+		};
+	}, [ledger, graph.id, nodeId]);
 
 	/**
 	 * What this node has already been asked, newest first.
@@ -60,8 +90,6 @@ export function CinemaInspector({
 			live = false;
 		};
 	}, [ledger, graph.id, nodeId]);
-	const node = graph.nodes.find((entry) => entry.id === nodeId);
-
 	/**
 	 * Writes a change and invalidates everything it reaches.
 	 *
@@ -83,6 +111,35 @@ export function CinemaInspector({
 		[graph, node, onChange],
 	);
 
+	/**
+	 * Records a verdict, and shows it immediately.
+	 *
+	 * Applied to local state before the write lands because a ClickHouse mutation
+	 * is asynchronous — re-reading the table here would return the old value and
+	 * read as a button that does nothing. If the write fails the row reverts and
+	 * says so, which is the honest outcome.
+	 */
+	const judge = useCallback(
+		(take: LedgerRow, accepted: boolean) => {
+			if (!ledger || !nodeId) return;
+			const stamp = take.at;
+			setTakes(
+				(rows) =>
+					rows?.map((row) => (row.at === stamp ? { ...row, accepted } : row)) ?? rows,
+			);
+			ledger.judge(graph.id, nodeId, stamp, accepted).catch(() => {
+				setTakes(
+					(rows) =>
+						rows?.map((row) =>
+							row.at === stamp ? { ...row, accepted: undefined } : row,
+						) ?? rows,
+				);
+				onNotice("That verdict did not save.", "error");
+			});
+		},
+		[ledger, graph.id, nodeId, onNotice],
+	);
+
 	const param = useCallback(
 		(key: string, value: unknown) => {
 			if (!node) return;
@@ -95,7 +152,32 @@ export function CinemaInspector({
 		return (
 			<div className="cin-insp cin-insp--empty">
 				<p>Select a node to edit it.</p>
-				<p className="cin-insp__hint">Double-click a node on the canvas.</p>
+				<p className="cin-insp__hint">Click a node on the canvas.</p>
+				{/* The second thing the ledger exists for, and it lives here because
+				    the empty inspector is the only pane in the app with nothing to
+				    say. A leaderboard of phrasings that survived a human is worth
+				    more than "nothing selected". */}
+				{works && works.length > 0 ? (
+					<div className="cin-insp__works">
+						<span className="cin-insp__label">What has been working</span>
+						<ol>
+							{works.map((entry) => (
+								<li key={entry.prompt}>
+									<span>{entry.prompt.slice(0, 140)}</span>
+									<em>
+										kept {entry.accepted}/{entry.total}
+									</em>
+								</li>
+							))}
+						</ol>
+					</div>
+				) : null}
+				{spend && spend.calls > 0 ? (
+					<p className="cin-insp__hint">
+						{spend.calls} model call{spend.calls === 1 ? "" : "s"} on this film
+						{spend.costUsd > 0 ? ` · $${spend.costUsd.toFixed(2)}` : ""}.
+					</p>
+				) : null}
 			</div>
 		);
 	}
@@ -267,17 +349,43 @@ export function CinemaInspector({
 				<div className="cin-insp__takes">
 					<span className="cin-insp__label">{takes.length} previous take(s)</span>
 					{takes.slice(0, 6).map((take) => (
-						<p
+						<div
 							key={`${take.at}-${take.nodeId}`}
 							className="cin-insp__take"
 							data-failed={!take.ok || undefined}
 						>
-							<strong>{take.at.slice(5, 16)}</strong>
-							<em>{take.ok ? take.model : (take.errorKind ?? "failed")}</em>
-							<span>
-								{take.ok ? `${(take.elapsedMs / 1000).toFixed(1)}s` : take.error}
-							</span>
-						</p>
+							<p>
+								<strong>{take.at.slice(5, 16)}</strong>
+								<em>{take.ok ? take.model : (take.errorKind ?? "failed")}</em>
+								<span>
+									{take.ok
+										? `${(take.elapsedMs / 1000).toFixed(1)}s`
+										: take.error}
+								</span>
+							</p>
+							{/* Judging is what turns a table of "a call happened" into one
+							    that can say which prompts work. Offered per take rather than
+							    on the node, so there is never a question of which picture
+							    the verdict landed on. Failures need no verdict — the model
+							    already gave one. */}
+							{take.ok ? (
+								<span className="cin-insp__verdict">
+									{take.accepted === undefined ? (
+										(["Keep", "Discard"] as const).map((choice) => (
+											<button
+												key={choice}
+												type="button"
+												onClick={() => judge(take, choice === "Keep")}
+											>
+												{choice}
+											</button>
+										))
+									) : (
+										<em>{take.accepted ? "kept" : "discarded"}</em>
+									)}
+								</span>
+							) : null}
+						</div>
 					))}
 				</div>
 			) : null}

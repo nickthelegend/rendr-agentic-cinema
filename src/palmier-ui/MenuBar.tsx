@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { starterGraph } from "../cinema/persist";
+import { can } from "../config/capabilities";
 import { toFcpxml, toXmeml } from "./interchange";
 import { splitAt } from "./reducers";
 import type { EditorApi } from "./state";
@@ -133,12 +134,20 @@ export function MenuBar({
 				{ separator: true, label: "" },
 				{ label: "Open Project…", shortcut: `${MOD}O`, action: onOpenClick },
 				{ label: "Import Media…", shortcut: `${MOD}I`, action: onImportClick },
-				{
-					label: "Record…",
-					shortcut: `${MOD}⇧R`,
-					action: onRecordClick,
-					disabled: recording,
-				},
+				// Recording is gated, not deleted. This item was the last way into
+				// the recorder from the UI after the panels were hidden, so leaving
+				// it here meant the cinema build still had a live door to a feature
+				// it says it does not have.
+				...(can("recording")
+					? [
+							{
+								label: "Record…",
+								shortcut: `${MOD}⇧R`,
+								action: onRecordClick,
+								disabled: recording,
+							},
+						]
+					: []),
 				{ separator: true, label: "" },
 				{ label: "Save Project", shortcut: `${MOD}S`, action: api.saveProject },
 				{
@@ -409,6 +418,12 @@ export function MenuBar({
 										key={item.label}
 										type="button"
 										role="menuitem"
+										// Named explicitly. The label sits in a child span
+										// beside a tick-mark span, and the computed name came
+										// out empty — every item in every menu read as an
+										// anonymous "menuitem" to a screen reader and to any
+										// test that goes looking for one by name.
+										aria-label={item.label}
 										className="pmr-menu__item"
 										disabled={item.disabled}
 										onClick={() => {
