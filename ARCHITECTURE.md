@@ -193,6 +193,21 @@ before the deadline.
 
 ---
 
+## Verified in a browser
+
+Against the stub provider, which covers everything except whether the API
+accepts our request shape:
+
+- A new film seeds a wired graph and renders on the first click.
+- A completed run leaves every node ready with its picture on the card.
+- Editing a Character marks it, the Story and both Scenes stale, and leaves
+  World and Beat alone — then the button reads "Render 4" for exactly those
+  four. That chain is the reason the graph exists, and it holds.
+- Undo steps the graph back and the canvas follows it.
+- Illegal connections are refused with the reason.
+
+`Test connection` covers the rest, and needs a key.
+
 ## Known, found by driving the app
 
 Kept here rather than in a commit message, because these are open.
