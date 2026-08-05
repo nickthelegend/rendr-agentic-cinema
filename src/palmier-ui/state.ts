@@ -10,6 +10,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CursorTelemetryPoint } from "@/components/video-editor/types";
+import type { CinemaGraph } from "../cinema/nodes";
+import { parseCinemaGraphs } from "../cinema/persist";
 import { forgetWaveform } from "./audio";
 import { type BackgroundSettings, DEFAULT_BACKGROUND } from "./background";
 import {
@@ -215,6 +217,17 @@ export interface EditorState {
 	/** Workflow graphs — an edit described rather than performed by hand. */
 	workflows: WorkflowModel[];
 	/**
+	 * Cinema graphs — a cast, a story and the scenes they compile into.
+	 *
+	 * Kept apart from `workflows` on purpose. A workflow describes an edit to
+	 * footage that already exists; a cinema graph produces the footage. They
+	 * share a canvas idiom and nothing else.
+	 */
+	cinemaGraphs: CinemaGraph[];
+	activeCinemaGraphId: string | null;
+	/** Which node the inspector is editing. */
+	selectedCinemaNodeId: string | null;
+	/**
 	 * Named grades, kept beside the timelines rather than inside them: a look
 	 * exists to outlive the clip it was pulled from.
 	 */
@@ -291,6 +304,9 @@ function initialState(): EditorState {
 		cursorTelemetry: [],
 		comments: [],
 		workflows: [],
+		cinemaGraphs: [],
+		activeCinemaGraphId: null,
+		selectedCinemaNodeId: null,
 		looks: [],
 		activeWorkflowId: null,
 		recording: {
@@ -1054,6 +1070,7 @@ export function useEditorState() {
 				zoomTiming: state.zoomTiming,
 				comments: state.comments,
 				workflows: state.workflows,
+				cinemaGraphs: state.cinemaGraphs,
 				looks: state.looks,
 				// Without the telemetry a reopened project has no pointer to draw
 				// and no clicks for suggest_zooms to read.
@@ -1071,6 +1088,7 @@ export function useEditorState() {
 			state.zoomTiming,
 			state.comments,
 			state.workflows,
+			state.cinemaGraphs,
 			state.looks,
 		],
 	);
@@ -1225,6 +1243,8 @@ export function useEditorState() {
 						zoomTiming: file.zoomTiming ?? { ...DEFAULT_ZOOM_TIMING },
 						comments: file.comments ?? [],
 						workflows: file.workflows ?? [],
+						cinemaGraphs: parseCinemaGraphs(file.cinemaGraphs),
+						activeCinemaGraphId: null,
 						looks: parseLooks(file.looks),
 						cursorTelemetry: file.cursorTelemetry ?? [],
 						selectedClipIds: [],
@@ -1320,6 +1340,45 @@ export function useEditorState() {
 			cursorTelemetry: [...points].sort((a, b) => a.timeMs - b.timeMs),
 			dirty: true,
 		}));
+	}, []);
+
+	/** Replaces one cinema graph, keeping the rest. */
+	const updateCinemaGraph = useCallback((next: CinemaGraph) => {
+		setState((current) => ({
+			...current,
+			cinemaGraphs: current.cinemaGraphs.map((graph) =>
+				graph.id === next.id ? next : graph,
+			),
+			dirty: true,
+		}));
+	}, []);
+
+	const addCinemaGraph = useCallback((graph: CinemaGraph) => {
+		setState((current) => ({
+			...current,
+			// Replace on id collision rather than appending a shadow, for the same
+			// reason workflows do: two graphs sharing an id means every lookup
+			// returns the first, and the new one is invisible while appearing to
+			// exist.
+			cinemaGraphs: [...current.cinemaGraphs.filter((e) => e.id !== graph.id), graph],
+			activeCinemaGraphId: graph.id,
+			dirty: true,
+		}));
+		return graph;
+	}, []);
+
+	const setActiveCinemaGraph = useCallback((graphId: string | null) => {
+		// Clearing the node selection with the graph: an id from the previous
+		// graph is not a valid target in this one.
+		setState((current) => ({
+			...current,
+			activeCinemaGraphId: graphId,
+			selectedCinemaNodeId: null,
+		}));
+	}, []);
+
+	const selectCinemaNode = useCallback((nodeId: string | null) => {
+		setState((current) => ({ ...current, selectedCinemaNodeId: nodeId }));
 	}, []);
 
 	const createTimeline = useCallback(
@@ -1924,6 +1983,10 @@ export function useEditorState() {
 		renameLook,
 		replaceTimeline,
 		setCursorTelemetry,
+		updateCinemaGraph,
+		addCinemaGraph,
+		setActiveCinemaGraph,
+		selectCinemaNode,
 		runNarration,
 		askFor,
 		closePrompt,

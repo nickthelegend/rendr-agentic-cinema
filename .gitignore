@@ -52,3 +52,7 @@ demo-out/
 
 # Unpacked wallet extension for demo recording (re-fetchable, ~28MB)
 vendor/walletchan/
+
+# Credentials — never committed
+.env.local
+.env*.local

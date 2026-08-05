@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./palmier.css";
 
 import type { CursorTelemetryPoint } from "@/components/video-editor/types";
+import { CinemaPanel } from "../cinema/CinemaPanel";
 import { autoZoomRegions } from "./autoZoom";
 import { DEFAULT_BACKGROUND } from "./background";
 import { DEFAULT_CURSOR } from "./cursor";
@@ -948,7 +949,13 @@ export function EditorShell() {
 		// answer different questions, and a workflow is what produces a timeline.
 		content: wrap(
 			"timeline",
-			state.activeWorkflowId ? (
+			// Three things can hold this pane, and only one at a time: a cinema
+			// graph produces footage, a workflow edits it, a timeline cuts it.
+			// The timeline is the fallback because it is the only one that is
+			// always meaningful.
+			state.activeCinemaGraphId ? (
+				<CinemaPanel api={api} />
+			) : state.activeWorkflowId ? (
 				<WorkflowPanel api={api} />
 			) : (
 				<TimelinePanel api={api} onImportClick={openImport} />

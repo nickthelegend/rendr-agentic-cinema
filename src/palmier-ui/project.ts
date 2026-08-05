@@ -9,6 +9,8 @@
 // better than silently restoring a timeline that renders black.
 
 import type { CursorTelemetryPoint } from "@/components/video-editor/types";
+import type { CinemaGraph } from "../cinema/nodes";
+import { parseCinemaGraphs } from "../cinema/persist";
 import { type BackgroundSettings, DEFAULT_BACKGROUND } from "./background";
 import { type CommentModel, parseComments } from "./comments";
 import { type CursorSettings, DEFAULT_CURSOR } from "./cursor";
@@ -61,6 +63,8 @@ export interface ProjectFile {
 	comments?: CommentModel[];
 	/** Workflow graphs saved with the project. */
 	workflows?: WorkflowModel[];
+	/** Cinema graphs — the cast, the story, and the scenes. */
+	cinemaGraphs?: CinemaGraph[];
 	/** Named grades. Absent in files written before looks existed. */
 	looks?: LookModel[];
 	/**
@@ -108,6 +112,7 @@ export function serializeProject(input: {
 	cursorTelemetry?: readonly CursorTelemetryPoint[];
 	comments?: readonly CommentModel[];
 	workflows?: readonly WorkflowModel[];
+	cinemaGraphs?: readonly CinemaGraph[];
 	/** Named grades. Absent in files written before looks existed. */
 	looks?: readonly LookModel[];
 }): ProjectFile {
@@ -124,6 +129,7 @@ export function serializeProject(input: {
 		...(input.zoomTiming ? { zoomTiming: input.zoomTiming } : {}),
 		...(input.comments?.length ? { comments: [...input.comments] } : {}),
 		...(input.workflows?.length ? { workflows: [...input.workflows] } : {}),
+		...(input.cinemaGraphs?.length ? { cinemaGraphs: [...input.cinemaGraphs] } : {}),
 		...(input.looks?.length ? { looks: [...input.looks] } : {}),
 		...(input.cursorTelemetry?.length ? { cursorTelemetry: [...input.cursorTelemetry] } : {}),
 	};
@@ -178,6 +184,9 @@ export function parseProject(text: string): ProjectFile {
 		// so one bad entry can't cost the user the whole project.
 		...(candidate.comments ? { comments: parseComments(candidate.comments) } : {}),
 		...(candidate.workflows ? { workflows: parseWorkflows(candidate.workflows) } : {}),
+		...(candidate.cinemaGraphs
+			? { cinemaGraphs: parseCinemaGraphs(candidate.cinemaGraphs) }
+			: {}),
 		...(candidate.looks ? { looks: parseLooks(candidate.looks) } : {}),
 		...(Array.isArray(candidate.cursorTelemetry)
 			? { cursorTelemetry: candidate.cursorTelemetry }

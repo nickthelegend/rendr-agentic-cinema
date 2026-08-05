@@ -3345,3 +3345,228 @@
 .pmr-snapline {
 	margin-left: var(--pmr-track-header);
 }
+
+/* ── Cinema graph ─────────────────────────────────────────────────────
+   A node graph is read as a flow, so the design job is direction: four
+   colour bands for the four stages, wires that clearly go somewhere, and
+   status that is legible without being loud. Everything else recedes —
+   the nodes carry images, and images lose against a busy chrome. */
+
+.cin {
+	display: grid;
+	grid-template-columns: 168px 1fr;
+	grid-template-rows: 1fr auto;
+	height: 100%;
+	min-height: 0;
+	background: var(--pmr-bg-sunken, #0c0f16);
+}
+
+.cin__palette {
+	grid-row: 1 / -1;
+	overflow-y: auto;
+	padding: 12px 10px 18px;
+	border-right: 1px solid var(--pmr-border, #1e2635);
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 140px);
+}
+
+.cin__group + .cin__group {
+	margin-top: 16px;
+}
+
+.cin__group-name {
+	margin: 0 0 7px 2px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.13em;
+	text-transform: uppercase;
+	opacity: 0.85;
+}
+
+.cin__add {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	margin-bottom: 5px;
+	padding: 8px 10px;
+	border: 1px solid var(--pmr-border, #1e2635);
+	border-left: 3px solid var(--tint);
+	border-radius: 7px;
+	background: var(--pmr-bg-raised, #141a26);
+	color: var(--pmr-text, #e6eaf2);
+	font: 500 12px / 1 inherit;
+	text-align: left;
+	cursor: grab;
+	transition:
+		transform 0.1s ease,
+		background 0.12s ease,
+		border-color 0.12s ease;
+}
+.cin__add:hover {
+	transform: translateX(2px);
+	background: color-mix(in srgb, var(--tint) 12%, var(--pmr-bg-raised, #141a26));
+	border-color: color-mix(in srgb, var(--tint) 45%, transparent);
+}
+.cin__add:active {
+	cursor: grabbing;
+}
+
+/* Marks a node that costs a model call, so the expensive ones are obvious
+   before you place forty of them. */
+.cin__spark {
+	color: var(--tint);
+	font-size: 9px;
+	opacity: 0.9;
+}
+
+.cin__canvas {
+	position: relative;
+	min-width: 0;
+	min-height: 0;
+}
+.cin__canvas .react-flow__background {
+	opacity: 0.5;
+}
+.cin__canvas .react-flow__edge-path {
+	stroke: var(--pmr-border-strong, #33415c);
+	stroke-width: 1.6;
+}
+.cin__canvas .react-flow__edge.selected .react-flow__edge-path {
+	stroke: var(--pmr-accent, #ff9f3d);
+}
+.cin__map {
+	background: var(--pmr-bg-raised, #141a26) !important;
+	border: 1px solid var(--pmr-border, #1e2635);
+	border-radius: 8px;
+}
+
+/* ── the node ──────────────────────────────────────────────────────── */
+
+.cin-node {
+	position: relative;
+	width: 182px;
+	padding: 9px 11px 10px;
+	border: 1px solid var(--pmr-border, #1e2635);
+	border-top: 2px solid var(--tint);
+	border-radius: 10px;
+	background: var(--pmr-bg-raised, #141a26);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	color: var(--pmr-text, #e6eaf2);
+	transition:
+		box-shadow 0.14s ease,
+		border-color 0.14s ease,
+		transform 0.14s ease;
+}
+.cin-node[data-selected] {
+	border-color: var(--pmr-accent, #ff9f3d);
+	box-shadow:
+		0 0 0 1px var(--pmr-accent, #ff9f3d),
+		0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.cin-node[data-status="failed"] {
+	border-color: #f2555a;
+}
+/* Stale is not an error — it is "this needs re-running", so it recedes
+   rather than shouting. */
+.cin-node[data-status="stale"] {
+	opacity: 0.62;
+}
+
+.cin-node__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	margin-bottom: 6px;
+}
+.cin-node__kind {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--tint);
+}
+.cin-node__status {
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--status) 22%, transparent);
+	color: var(--status);
+	font-size: 9px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+}
+/* The one animation in here, and only while something is genuinely running. */
+.cin-node__status[data-status="running"] {
+	animation: cin-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cin-pulse {
+	50% {
+		opacity: 0.45;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.cin-node__status[data-status="running"] {
+		animation: none;
+	}
+	.cin__add {
+		transition: none;
+	}
+}
+
+.cin-node__thumb {
+	display: block;
+	width: 100%;
+	height: 84px;
+	margin-bottom: 7px;
+	border-radius: 6px;
+	object-fit: cover;
+	background: #0a0e15;
+}
+
+.cin-node__label {
+	margin: 0;
+	font-size: 11.5px;
+	line-height: 1.35;
+	color: var(--pmr-text-muted, #9aa6bd);
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.cin-node__issue,
+.cin-node__error {
+	margin: 7px 0 0;
+	font-size: 10px;
+	line-height: 1.35;
+}
+.cin-node__issue {
+	color: #e8a33d;
+}
+.cin-node__error {
+	color: #f2555a;
+}
+
+.cin-port {
+	width: 9px !important;
+	height: 9px !important;
+	border: 2px solid var(--pmr-bg-raised, #141a26) !important;
+	background: var(--tint) !important;
+}
+
+.cin__issues {
+	grid-column: 2;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 7px 12px;
+	border-top: 1px solid var(--pmr-border, #1e2635);
+	background: var(--pmr-bg-raised, #141a26);
+}
+.cin__issue {
+	padding: 3px 8px;
+	border-radius: 999px;
+	background: rgba(232, 163, 61, 0.14);
+	color: #e8a33d;
+	font-size: 10.5px;
+}
