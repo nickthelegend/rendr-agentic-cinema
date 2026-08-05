@@ -239,6 +239,10 @@ prompts that produced kept shots, ranked, with the film's running call count
 under them. Keep/Discard on each take is what feeds the second one; without a
 verdict every row is "a call happened" and the leaderboard ranks nulls.
 
-`spentOn` is displayed but not yet *enforced*. The auto-mode spend ceiling
-described above still needs the debounce and the confirm-above-threshold; the
-number it would read is now on screen, which is the smaller half of that job.
+**Auto mode exists now, and so does its guard.** The toggle was wired to
+nothing — no code in the app read `graph.auto`, so it was a light switch with no
+bulb. A pass now waits two seconds after the last edit, reads the film's spend
+from the ledger, refuses if the pass would cross the ceiling, and asks before
+rendering more than four nodes. An unreachable ledger pauses auto mode rather
+than removing the limit: refusing to spend is the safe direction to fail in.
+The decision is one pure function so the guard can be tested without a render.

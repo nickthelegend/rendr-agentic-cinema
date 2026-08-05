@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { withDefaults } from "../palmier-ui/model";
 import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
+import { AUTO_DEBOUNCE_MS, confirmMessage, decideAuto } from "./auto";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
@@ -363,6 +364,58 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 		},
 		[api, graph, notice, running],
 	);
+
+	/**
+	 * Auto mode.
+	 *
+	 * The toggle existed and did nothing — nothing in the app read `graph.auto`,
+	 * so the button was a light switch wired to no bulb. This is the wire, and
+	 * the guard is the point of it: a debounce so a half-typed sentence never
+	 * triggers a pass, a ceiling read from the ledger so a session cannot run
+	 * away, and a confirmation once a pass is big enough to be a decision.
+	 *
+	 * Keyed on how many nodes are stale rather than on the graph, so moving a
+	 * node or renaming a film does not restart the timer.
+	 */
+	useEffect(() => {
+		if (!graph.auto || running || pending <= 0) return;
+		let live = true;
+		const timer = setTimeout(async () => {
+			// Read the spend at fire time, not at schedule time: a manual render
+			// during the debounce window counts against the same ceiling.
+			let spent = 0;
+			try {
+				spent = (await ledger.current?.spentOn(graph.id))?.calls ?? 0;
+			} catch {
+				// An unreachable ledger must not become an unlimited budget. Treat
+				// an unknown spend as the ceiling reached, and say so — refusing to
+				// spend is the safe direction to fail in.
+				if (live) notice("Auto mode paused: the ledger is unreachable.", "error");
+				return;
+			}
+			if (!live) return;
+
+			const decision = decideAuto({
+				auto: graph.auto,
+				pending,
+				spent,
+				ceiling: Number(import.meta.env.VITE_AUTO_CALL_CEILING) || undefined,
+				busy: running,
+			});
+			if (decision.blocked) {
+				notice(decision.blocked, "error");
+				return;
+			}
+			if (!decision.run) return;
+			if (decision.confirm && !window.confirm(confirmMessage(pending, spent))) return;
+			if (live) void run();
+		}, AUTO_DEBOUNCE_MS);
+
+		return () => {
+			live = false;
+			clearTimeout(timer);
+		};
+	}, [graph.auto, graph.id, pending, running, run, notice]);
 
 	return (
 		<>
