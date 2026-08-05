@@ -207,12 +207,5 @@ coordinates.
 is saved, so a refresh during development starts over. Fine for a save-backed
 app, surprising while iterating.
 
-**The graph has no undo.** Edit → Undo is wired to the timeline, so a node
-added or deleted by accident cannot be taken back — the only way out is to
-select and press Backspace, which nothing in the interface says. Adding a node
-is one click and undoing it is a guess, which is the wrong way round. The graph
-is immutable on every edit already, so an undo stack is a list of previous
-graphs rather than a new mechanism.
-
 **Nothing has called the real API.** Every generative path is exercised against
 the stub. `npm run preflight` is the check that closes this, and it needs a key.

@@ -26,7 +26,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
 	type CinemaGraph,
@@ -170,6 +170,54 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 		})),
 	);
 	const [dropKind, setDropKind] = useState<CinemaNodeKind | null>(null);
+
+	/**
+	 * Pull React Flow back in line when the graph changed from outside.
+	 *
+	 * React Flow owns its node list once mounted, which is right while dragging
+	 * and wrong for anything else. Undo proved it: the graph stepped back, the
+	 * button behaved, and the canvas carried on showing the node that had just
+	 * been removed — a change that appears to do nothing is worse than a button
+	 * that refuses.
+	 *
+	 * Keyed on the ids and their status rather than the objects, so a drag
+	 * (positions only) does not fight the pointer by resyncing mid-gesture.
+	 */
+	const signature = graph.nodes
+		.map((node) => `${node.id}:${node.status}:${node.output ? 1 : 0}`)
+		.join("|");
+	const edgeSignature = graph.edges.map((edge) => edge.id).join("|");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the
+	// signatures deliberately — depending on graph.nodes would resync on every
+	// drag frame.
+	useEffect(() => {
+		setNodes((current) =>
+			graph.nodes.map((node) => {
+				const live = current.find((entry) => entry.id === node.id);
+				return {
+					id: node.id,
+					type: "cinema",
+					// Keep the live position when the node survived, so an undo of
+					// a text edit does not also snap a node someone just moved.
+					position: live?.position ?? { x: node.x, y: node.y },
+					selected: live?.selected,
+					data: { node, issue: issueFor(node.id), onOpen: onOpenNode },
+				};
+			}),
+		);
+	}, [signature, issueFor, onOpenNode, setNodes]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: same reason.
+	useEffect(() => {
+		setEdges(
+			graph.edges.map((edge) => ({
+				id: edge.id,
+				source: edge.from,
+				target: edge.to,
+				animated: true,
+			})),
+		);
+	}, [edgeSignature, setEdges]);
 
 	// React Flow owns positions while dragging; the graph is told once the drag
 	// settles, so a commit does not fight the pointer.

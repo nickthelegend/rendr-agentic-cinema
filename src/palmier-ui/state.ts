@@ -225,6 +225,15 @@ export interface EditorState {
 	 */
 	cinemaGraphs: CinemaGraph[];
 	activeCinemaGraphId: string | null;
+	/**
+	 * Previous states of the active graph, newest last.
+	 *
+	 * Cheap because a graph is replaced wholesale on every edit, so this is a
+	 * list of things that already existed rather than a new mechanism. Bounded,
+	 * because a graph carries base64 character sheets and an unbounded stack of
+	 * those is megabytes of a project file nobody asked for.
+	 */
+	cinemaUndo: CinemaGraph[];
 	/** Which node the inspector is editing. */
 	selectedCinemaNodeId: string | null;
 	/**
@@ -306,6 +315,7 @@ function initialState(): EditorState {
 		workflows: [],
 		cinemaGraphs: [],
 		activeCinemaGraphId: null,
+		cinemaUndo: [],
 		selectedCinemaNodeId: null,
 		looks: [],
 		activeWorkflowId: null,
@@ -1343,14 +1353,45 @@ export function useEditorState() {
 	}, []);
 
 	/** Replaces one cinema graph, keeping the rest. */
-	const updateCinemaGraph = useCallback((next: CinemaGraph) => {
-		setState((current) => ({
-			...current,
-			cinemaGraphs: current.cinemaGraphs.map((graph) =>
-				graph.id === next.id ? next : graph,
-			),
-			dirty: true,
-		}));
+	const updateCinemaGraph = useCallback(
+		(next: CinemaGraph, options: { undoable?: boolean } = {}) => {
+			setState((current) => {
+				const previous = current.cinemaGraphs.find((graph) => graph.id === next.id);
+				// Progress ticks during a run pass undoable: false. Without that, a
+				// render of six scenes buries every real edit under twelve status
+				// changes and undo becomes useless exactly when it is most wanted.
+				const remember = options.undoable !== false && previous && previous !== next;
+				return {
+					...current,
+					cinemaGraphs: current.cinemaGraphs.map((graph) =>
+						graph.id === next.id ? next : graph,
+					),
+					cinemaUndo: remember
+						? [...current.cinemaUndo.slice(-19), previous]
+						: current.cinemaUndo,
+					dirty: true,
+				};
+			});
+		},
+		[],
+	);
+
+	/** Steps the active graph back one edit. */
+	const undoCinema = useCallback(() => {
+		setState((current) => {
+			const previous = current.cinemaUndo[current.cinemaUndo.length - 1];
+			if (!previous) return current;
+			return {
+				...current,
+				cinemaGraphs: current.cinemaGraphs.map((graph) =>
+					graph.id === previous.id ? previous : graph,
+				),
+				cinemaUndo: current.cinemaUndo.slice(0, -1),
+				// A node id from the undone state may no longer exist.
+				selectedCinemaNodeId: null,
+				dirty: true,
+			};
+		});
 	}, []);
 
 	const addCinemaGraph = useCallback((graph: CinemaGraph) => {
@@ -1984,6 +2025,7 @@ export function useEditorState() {
 		replaceTimeline,
 		setCursorTelemetry,
 		updateCinemaGraph,
+		undoCinema,
 		addCinemaGraph,
 		setActiveCinemaGraph,
 		selectCinemaNode,

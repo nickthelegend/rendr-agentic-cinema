@@ -5,7 +5,7 @@
 // drawing is in CinemaCanvas.tsx, and this is the seam between them and the
 // editor's state.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
@@ -87,6 +87,23 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 		}
 	}, [checking]);
 
+	// ⌘Z belongs to whatever is on screen. With a film open that is the graph;
+	// sending it to the timeline instead would undo an edit the user cannot
+	// even see, which is worse than doing nothing.
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+			const target = event.target as HTMLElement | null;
+			// Not while typing — ⌘Z in a textarea is the field's own undo.
+			if (target && /^(input|textarea)$/i.test(target.tagName)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			api.undoCinema();
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, [api]);
+
 	const issues = graphIssues(graph);
 	const ready = issues.length === 0 && graph.nodes.length > 0;
 	const pending = estimateRun(graph);
@@ -114,12 +131,17 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					// Progress is written straight back to the graph, so the canvas
 					// shows a node going running → ready while the rest still wait.
 					onProgress: (nodeId, status) =>
-						api.updateCinemaGraph({
-							...graph,
-							nodes: graph.nodes.map((node) =>
-								node.id === nodeId ? { ...node, status } : node,
-							),
-						}),
+						api.updateCinemaGraph(
+							{
+								...graph,
+								nodes: graph.nodes.map((node) =>
+									node.id === nodeId ? { ...node, status } : node,
+								),
+							},
+							// Status ticks are not edits. Recording them would bury
+							// every real change under a dozen of these.
+							{ undoable: false },
+						),
 				});
 				api.updateCinemaGraph(report.graph);
 				for (const line of report.continuity.slice(0, 3)) notice(line);
@@ -158,6 +180,15 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					onClick={() => api.updateCinemaGraph({ ...graph, auto: !graph.auto })}
 				>
 					{graph.auto ? "Auto: on" : "Auto: off"}
+				</button>
+				<button
+					type="button"
+					className="pmr-button"
+					disabled={state.cinemaUndo.length === 0}
+					title="Undo the last change to the graph (⌘Z)"
+					onClick={api.undoCinema}
+				>
+					Undo
 				</button>
 				<button
 					type="button"
