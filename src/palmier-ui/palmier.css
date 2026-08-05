@@ -3778,14 +3778,22 @@
 .cin-insp__takes {
 	margin-top: 14px;
 }
+/* The take row became a wrapper when Keep/Discard moved inside it, and the
+   grid stayed on the wrapper — leaving the line of text unstyled and its three
+   inline children overlapping in a 74px column. The grid belongs on the line. */
 .cin-insp__take {
-	display: grid;
-	grid-template-columns: 74px 1fr;
-	gap: 2px 8px;
-	margin: 0 0 6px;
+	margin: 0 0 8px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--pmr-border, rgba(255, 255, 255, 0.07));
 	font-size: 10.5px;
 	line-height: 1.4;
 	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__take > p {
+	display: grid;
+	grid-template-columns: 74px 1fr;
+	gap: 2px 8px;
+	margin: 0;
 }
 .cin-insp__take strong {
 	font-weight: 600;
@@ -3803,15 +3811,33 @@
 	opacity: 0.8;
 }
 
-.cin-insp__judge {
+/* Keep / Discard on a take. Small and quiet: a verdict is a decision, but it
+   sits inside a history row and must not outweigh the row it judges. */
+.cin-insp__verdict {
 	display: flex;
+	gap: 5px;
 	align-items: center;
-	gap: 6px;
-	margin-top: 14px;
+	margin-top: 4px;
+	grid-column: 1 / -1;
 }
-.cin-insp__judge .cin-insp__label {
-	flex: 1;
-	margin: 0;
+.cin-insp__verdict button {
+	font: inherit;
+	font-size: 10px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	color: var(--pmr-text-muted, #9aa6bd);
+	background: var(--pmr-surface-2, rgba(255, 255, 255, 0.04));
+	border: 1px solid var(--pmr-border, rgba(255, 255, 255, 0.1));
+}
+.cin-insp__verdict button:hover {
+	color: var(--pmr-text, #e7ecf5);
+	border-color: #3fc79a;
+}
+.cin-insp__verdict em {
+	font-size: 10px;
+	color: #3fc79a;
+	font-style: normal;
 }
 
 .cin-insp__works {
