@@ -139,3 +139,54 @@ while the thing that actually wins — consistent characters across scenes,
 landing on a timeline — stays half done. Build the spine first: one character,
 one story, three scenes, on the timeline. Everything else is decoration on top
 of a thing that works.
+
+---
+
+## Decisions, locked
+
+**Partner: Clickhouse.** Every node run is a row — prompt, seed, model, cost,
+latency, accepted or rejected. Chosen over Parallel because it is the only
+track where the integration is a feature the user sees rather than plumbing:
+the rejected-takes gallery and the prompt leaderboard both fall straight out of
+the ledger, and both are queries, not decoration. The rules require the partner
+"imported and called in code, not just named in the README", and a ledger is
+called on every single run.
+
+**Character sheet: four angles** — front, three-quarter, profile, back. Enough
+for the model to hold identity across most shot types, cheap enough to
+regenerate freely while a cast is still being iterated on.
+
+**Auto mode: fully automatic.** A story edit re-derives and re-renders
+downstream without asking. `descendants()` already computes exactly that set.
+
+> **Guard this one.** Fully automatic plus a paid video model means every
+> keystroke in a story node can trigger paid renders. Before auto mode touches
+> anything that costs money it needs, at minimum: a debounce on text edits so a
+> half-typed sentence never triggers a pass, a per-session spend ceiling read
+> from the ledger, and a confirm above a threshold. Text re-derivation is cheap
+> and can be truly instant; picture generation is where the money is. Build the
+> guard with the feature, not after the first surprising bill.
+
+**Models.** Gemini for story, prompts and continuity; Gemini image
+(Nano Banana) for sheets and shots, chosen for holding a subject across
+generations.
+
+### On Veo, precisely
+
+A Google AI Pro plan — bought directly or bundled through Jio — *does* include
+Veo. In the Gemini app and in Flow. That is genuine access and it is not
+nothing: hero shots can be made there by hand and imported as reference.
+
+What a consumer plan does not include is **API quota**. The subscription and
+the API are separately billed products, and no code here can call the former.
+For the graph to render a shot in code it needs either the free Gemini API tier
+(text and image, no Veo) or pay-as-you-go billing (Veo, charged per second).
+
+So scenes render as generated stills with a camera move on the timeline, behind
+an interface that takes a video provider. The consistency thesis — the same
+face across eleven shots — is provable entirely in stills, and the timeline
+already animates them. Veo swaps in without the graph changing when billing
+exists.
+
+This also keeps the submission demo off a quota that could run out an hour
+before the deadline.
