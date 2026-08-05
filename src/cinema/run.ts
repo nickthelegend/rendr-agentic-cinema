@@ -59,6 +59,8 @@ export interface LedgerEntry {
 	elapsedMs: number;
 	ok: boolean;
 	error?: string;
+	/** Classified, so "wait or pay" stays distinct from "reword it". */
+	errorKind?: string;
 }
 
 export interface RunReport {
@@ -293,6 +295,7 @@ async function runNode(
 	return {
 		sheet: [shot.image],
 		text: specs[which].action,
+		prompt: shot.prompt,
 		seed: shot.seed,
 		model: shot.model,
 		elapsedMs: shot.elapsedMs,

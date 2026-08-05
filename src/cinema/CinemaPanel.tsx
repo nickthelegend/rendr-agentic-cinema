@@ -335,6 +335,7 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 								elapsedMs: entry.elapsedMs,
 								ok: entry.ok,
 								error: entry.error,
+								errorKind: entry.errorKind,
 							})
 							.catch(() => {});
 					},
@@ -460,6 +461,7 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 				<CinemaInspector
 					graph={graph}
 					nodeId={state.selectedCinemaNodeId}
+					ledger={ledger.current}
 					onChange={api.updateCinemaGraph}
 					onRun={(nodeId) => run([nodeId])}
 					onNotice={notice}

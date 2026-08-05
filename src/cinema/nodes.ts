@@ -194,6 +194,8 @@ export interface NodeOutput {
 	model?: string;
 	/** Milliseconds the run took. */
 	elapsedMs?: number;
+	/** What was actually sent, so the ledger can record it. */
+	prompt?: string;
 }
 
 /**

@@ -3772,3 +3772,33 @@
 	font-style: normal;
 	color: var(--pmr-text-muted, #9aa6bd);
 }
+
+/* Previous takes. Dense on purpose — six rows of "what was tried and what
+   happened" is a reference, not a feature to admire. */
+.cin-insp__takes {
+	margin-top: 14px;
+}
+.cin-insp__take {
+	display: grid;
+	grid-template-columns: 74px 1fr;
+	gap: 2px 8px;
+	margin: 0 0 6px;
+	font-size: 10.5px;
+	line-height: 1.4;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__take strong {
+	font-weight: 600;
+	font-family: ui-monospace, Menlo, monospace;
+}
+.cin-insp__take em {
+	font-style: normal;
+	color: #3fc79a;
+}
+.cin-insp__take[data-failed] em {
+	color: #f2555a;
+}
+.cin-insp__take span {
+	grid-column: 2;
+	opacity: 0.8;
+}

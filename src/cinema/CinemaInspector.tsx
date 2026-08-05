@@ -6,8 +6,9 @@
 // canvas shows renders of a person who has since been redressed and looks
 // current while being wrong.
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import type { Ledger, LedgerRow } from "./ledger";
 import type { CinemaGraph, CinemaNode } from "./nodes";
 import { nodeSpec } from "./nodes";
 import { markStale } from "./run";
@@ -17,6 +18,8 @@ const ASPECTS = ["16:9", "9:16", "1:1", "4:5"] as const;
 export interface CinemaInspectorProps {
 	graph: CinemaGraph;
 	nodeId: string | null;
+	/** Absent when Clickhouse is not configured; the history panel says so. */
+	ledger?: Ledger | null;
 	onChange: (next: CinemaGraph) => void;
 	onRun: (nodeId: string) => void;
 	onNotice: (message: string, tone?: "error" | "info") => void;
@@ -25,10 +28,38 @@ export interface CinemaInspectorProps {
 export function CinemaInspector({
 	graph,
 	nodeId,
+	ledger,
 	onChange,
 	onRun,
 	onNotice,
 }: CinemaInspectorProps) {
+	const [takes, setTakes] = useState<LedgerRow[] | null>(null);
+
+	/**
+	 * What this node has already been asked, newest first.
+	 *
+	 * The reason the ledger exists: regenerating a shot without seeing the four
+	 * takes you already rejected means paying for the same mistake twice. Loaded
+	 * per node rather than up front, because a film's whole history is a lot of
+	 * rows and only one node is ever being looked at.
+	 */
+	useEffect(() => {
+		setTakes(null);
+		if (!ledger || !nodeId) return;
+		let live = true;
+		ledger
+			.takesFor(graph.id, nodeId)
+			.then((rows) => {
+				if (live) setTakes(rows);
+			})
+			// A history that will not load must not break the panel around it.
+			.catch(() => {
+				if (live) setTakes([]);
+			});
+		return () => {
+			live = false;
+		};
+	}, [ledger, graph.id, nodeId]);
 	const node = graph.nodes.find((entry) => entry.id === nodeId);
 
 	/**
@@ -227,6 +258,33 @@ export function CinemaInspector({
 						))}
 					</ol>
 				</div>
+			) : null}
+
+			{/* History. Only worth showing once something has been tried, and the
+			    failures are the interesting rows — they say why a shot keeps not
+			    arriving, which a list of successes cannot. */}
+			{ledger && takes && takes.length > 0 ? (
+				<div className="cin-insp__takes">
+					<span className="cin-insp__label">{takes.length} previous take(s)</span>
+					{takes.slice(0, 6).map((take) => (
+						<p
+							key={`${take.at}-${take.nodeId}`}
+							className="cin-insp__take"
+							data-failed={!take.ok || undefined}
+						>
+							<strong>{take.at.slice(5, 16)}</strong>
+							<em>{take.ok ? take.model : (take.errorKind ?? "failed")}</em>
+							<span>
+								{take.ok ? `${(take.elapsedMs / 1000).toFixed(1)}s` : take.error}
+							</span>
+						</p>
+					))}
+				</div>
+			) : null}
+			{ledger === null && spec?.generative ? (
+				<p className="cin-insp__hint">
+					Connect Clickhouse to keep a history of what was tried.
+				</p>
 			) : null}
 
 			{node.status === "stale" ? (

@@ -228,9 +228,8 @@ app, surprising while iterating.
 the stub. `npm run preflight`, or the Test connection button, is the check that
 closes this — both need a key.
 
-**The ledger is write-only so far.** Every call is recorded, but nothing reads
-it back yet. The two features it exists for — showing the takes already
-rejected for a node, and querying which prompts produced accepted shots — are
-queries that exist in ledger.ts (`takesFor`, `whatWorks`) with no UI on them.
-`spentOn` is likewise ready for the auto-mode spend ceiling and unused. This is
-the cheapest remaining work with the most visible payoff.
+**Half the ledger is read back.** A node's previous takes show in the
+inspector — what was tried, when, and why it failed. `whatWorks` (the prompt
+leaderboard) and `spentOn` (the auto-mode spend ceiling) still have no UI, and
+`accepted` is never set because nothing offers a keep-or-discard yet. Without
+that, the leaderboard has nothing to rank.
