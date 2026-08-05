@@ -225,4 +225,12 @@ is saved, so a refresh during development starts over. Fine for a save-backed
 app, surprising while iterating.
 
 **Nothing has called the real API.** Every generative path is exercised against
-the stub. `npm run preflight` is the check that closes this, and it needs a key.
+the stub. `npm run preflight`, or the Test connection button, is the check that
+closes this — both need a key.
+
+**The ledger is write-only so far.** Every call is recorded, but nothing reads
+it back yet. The two features it exists for — showing the takes already
+rejected for a node, and querying which prompts produced accepted shots — are
+queries that exist in ledger.ts (`takesFor`, `whatWorks`) with no UI on them.
+`spentOn` is likewise ready for the auto-mode spend ceiling and unused. This is
+the cheapest remaining work with the most visible payoff.

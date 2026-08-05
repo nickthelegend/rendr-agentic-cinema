@@ -1,11 +1,10 @@
 // Putting the finished scenes on the timeline.
 //
-// NOT WIRED YET. The module is complete and tested, but the editor calls it
-// needs — placing a clip, applying a camera move — go through timeline reducers
-// rather than through anything on the api surface, and hooking that up wants
-// more care than a leftover half hour. The CommitTarget interface is what the
-// panel has to satisfy; nothing here is guesswork about the model or the
-// scenes, only about which editor function places a clip.
+// readyScenes is what the panel uses: which scenes have rendered, in the order
+// the story asked for. commitToTimeline is the same placement expressed against
+// an injectable target, which is how the ordering and the refusals are tested
+// without an editor running — the panel does the real placement inline because
+// it needs the editor's own reducer to build the clips.
 //
 // The last step, and the one that makes this a project rather than a folder of
 // images: every scene becomes a clip on a real timeline with a camera move over

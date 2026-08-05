@@ -5,7 +5,7 @@
 // drawing is in CinemaCanvas.tsx, and this is the seam between them and the
 // editor's state.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { withDefaults } from "../palmier-ui/model";
 import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
@@ -13,6 +13,7 @@ import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
 import { readyScenes } from "./commit";
+import { createClickhouseLedger, type Ledger } from "./ledger";
 import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
@@ -26,6 +27,7 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 
 	const [running, setRunning] = useState(false);
 	const [checks, setChecks] = useState<CheckResult[] | null>(null);
+	const ledger = useRef<Ledger | null>(null);
 	const [checking, setChecking] = useState(false);
 	const notice = useCallback(
 		(message: string, tone?: "error" | "info") =>
@@ -287,6 +289,24 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					"No API key — running the local stub. Frames are placeholders. Put VITE_GEMINI_API_KEY in .env.local for the real thing.",
 				);
 			}
+			// The ledger is optional and never blocks a render. Configured, it
+			// records every call; absent, the run is identical minus the history.
+			if (!ledger.current) {
+				const url = import.meta.env.VITE_CLICKHOUSE_URL ?? "";
+				if (url) {
+					ledger.current = createClickhouseLedger({
+						url,
+						user: import.meta.env.VITE_CLICKHOUSE_USER ?? "default",
+						password: import.meta.env.VITE_CLICKHOUSE_PASSWORD ?? "",
+					});
+					// Failing to create the table must not stop the film.
+					await ledger.current.init().catch((error) => {
+						notice(`Ledger unavailable: ${String(error).slice(0, 120)}`, "error");
+						ledger.current = null;
+					});
+				}
+			}
+
 			setRunning(true);
 			try {
 				const report = await runGraph(provider, graph, {
@@ -299,6 +319,25 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					onProgress: (_nodeId, _status, live) =>
 						// Status ticks are not edits, so they stay out of undo.
 						api.updateCinemaGraph(live, { undoable: false }),
+					onRecord: (entry) => {
+						// Fire and forget, and swallow the failure: bookkeeping must
+						// never take a render down with it. The ledger holds what it
+						// could not send and retries on the next call.
+						void ledger.current
+							?.record({
+								at: new Date().toISOString().replace("T", " ").replace("Z", ""),
+								graphId: graph.id,
+								nodeId: entry.nodeId,
+								nodeKind: entry.kind,
+								model: entry.model ?? "",
+								prompt: entry.prompt ?? "",
+								seed: entry.seed,
+								elapsedMs: entry.elapsedMs,
+								ok: entry.ok,
+								error: entry.error,
+							})
+							.catch(() => {});
+					},
 				});
 				api.updateCinemaGraph(report.graph);
 				for (const line of report.continuity.slice(0, 3)) notice(line);
