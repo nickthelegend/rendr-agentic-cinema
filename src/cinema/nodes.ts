@@ -397,8 +397,17 @@ export function graphIssues(graph: CinemaGraph): Array<{ nodeId?: string; messag
 		const spec = nodeSpec(node.kind);
 		if (!spec) continue;
 		const incoming = inputsOf(graph, node.id).length;
-		if (spec.maxInputs !== 0 && incoming === 0 && node.kind !== "beat") {
-			issues.push({ nodeId: node.id, message: `${spec.label} has no input.` });
+		// A node carrying its own text needs no input — a Character described in
+		// its own words is complete, and so is a World. Flagging those was a
+		// false positive that contradicted the runner: the panel said "2 to fix"
+		// about a graph that ran to completion, which teaches people to ignore
+		// the count.
+		const selfSufficient = Boolean(node.text?.trim()) || node.kind === "beat";
+		if (spec.maxInputs !== 0 && incoming === 0 && !selfSufficient) {
+			issues.push({
+				nodeId: node.id,
+				message: `${spec.label} has no input and nothing written in it.`,
+			});
 		}
 		if (spec.hasOutput && !graph.edges.some((edge) => edge.from === node.id)) {
 			issues.push({ nodeId: node.id, message: `${spec.label} feeds nothing.` });

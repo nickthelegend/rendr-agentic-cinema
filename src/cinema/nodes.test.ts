@@ -148,6 +148,27 @@ describe("descendants", () => {
 });
 
 describe("issues", () => {
+	it("does not flag a node that carries its own text", () => {
+		// The panel used to report "2 to fix" on a graph that ran to completion,
+		// which is the fastest way to teach someone to ignore the count.
+		const g = graph(
+			[
+				{ ...node("c", "character"), text: "A dock worker in her fifties." },
+				node("t", "timeline"),
+			],
+			[["c", "t"]],
+		);
+		expect(g.nodes[0].text).toBeTruthy();
+		expect(graphIssues(g).some((i) => i.nodeId === "c" && i.message.includes("no input"))).toBe(
+			false,
+		);
+	});
+
+	it("still flags one that is empty and unwired", () => {
+		const g = graph([node("c", "character"), node("t", "timeline")], [["c", "t"]]);
+		expect(graphIssues(g).some((i) => i.message.includes("nothing written"))).toBe(true);
+	});
+
 	it("says an empty graph needs a start", () => {
 		expect(graphIssues(graph([]))[0].message).toContain("Empty graph");
 	});

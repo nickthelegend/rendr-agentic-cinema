@@ -6,6 +6,7 @@
 // the timeline, and the MCP tools all mutate the timeline the same way.
 
 import { useEffect, useRef, useState } from "react";
+import { can } from "@/config/capabilities";
 
 import { measureNoiseFloor, suggestedDenoiseStrength } from "../analysis";
 import { decodeAudio, monoSamples } from "../audio";
@@ -1274,8 +1275,16 @@ export function InspectorPanel({ api }: { api: EditorApi }) {
 					<BackgroundSection api={api} />
 					<ZoomMotionSection api={api} />
 					<NarrationSection api={api} />
-					<CursorSection api={api} />
-					<WebcamSection api={api} />
+					{/* Both are recorder controls — a drawn pointer and a camera
+					    bubble over captured footage. In a cinema build there is no
+					    telemetry for one and no camera for the other, so they are
+					    rows of dead sliders. */}
+					{can("recording") ? (
+						<>
+							<CursorSection api={api} />
+							<WebcamSection api={api} />
+						</>
+					) : null}
 					<div className="pmr-empty" style={{ paddingTop: 4 }}>
 						<span>Nothing selected</span>
 						<span style={{ maxWidth: 200 }}>
