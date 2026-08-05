@@ -3570,3 +3570,143 @@
 	color: #e8a33d;
 	font-size: 10.5px;
 }
+
+/* Canvas and inspector share the pane: the graph is the work, the inspector
+   is one node at a time, and both need to be visible while wiring. */
+.cin-shell {
+	display: grid;
+	grid-template-columns: 1fr 288px;
+	height: 100%;
+	min-height: 0;
+}
+
+.cin-insp {
+	overflow-y: auto;
+	padding: 14px 14px 22px;
+	border-left: 1px solid var(--pmr-border, #1e2635);
+	background: var(--pmr-bg-raised, #141a26);
+	font-size: 12px;
+}
+.cin-insp--empty {
+	display: grid;
+	place-content: center;
+	text-align: center;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__hint {
+	font-size: 10.5px;
+	opacity: 0.7;
+}
+.cin-insp__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.cin-insp__head h3 {
+	margin: 0;
+	font-size: 13px;
+}
+.cin-insp__summary {
+	margin: 4px 0 14px;
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__field {
+	display: block;
+	margin-bottom: 12px;
+}
+.cin-insp__field > span {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__field input,
+.cin-insp__field textarea,
+.cin-insp__field select {
+	width: 100%;
+	padding: 7px 9px;
+	border: 1px solid var(--pmr-border, #1e2635);
+	border-radius: 7px;
+	background: var(--pmr-bg-sunken, #0c0f16);
+	color: var(--pmr-text, #e6eaf2);
+	font: inherit;
+	resize: vertical;
+}
+.cin-insp__field input:focus,
+.cin-insp__field textarea:focus {
+	outline: none;
+	border-color: var(--pmr-accent, #ff9f3d);
+}
+.cin-insp__field small {
+	display: block;
+	margin-top: 4px;
+	font-size: 10px;
+	line-height: 1.4;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+/* The sheet is shown, not described — four faces is the one thing a status
+   word cannot tell you about. */
+.cin-insp__sheet-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 5px;
+}
+.cin-insp__sheet-grid img,
+.cin-insp__thumb {
+	width: 100%;
+	border-radius: 6px;
+	background: #0a0e15;
+}
+.cin-insp__out {
+	margin-top: 14px;
+}
+.cin-insp__out p {
+	margin: 0;
+	font-size: 11.5px;
+	line-height: 1.5;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__shots {
+	margin: 0;
+	padding-left: 16px;
+	font-size: 11px;
+	line-height: 1.5;
+}
+.cin-insp__shots li {
+	margin-bottom: 7px;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-insp__shots em {
+	display: block;
+	font-size: 10px;
+	opacity: 0.75;
+	font-style: normal;
+}
+.cin-insp__error {
+	margin-top: 10px;
+	font-size: 11px;
+	color: #f2555a;
+}
+.cin-insp__stale {
+	margin-top: 12px;
+	padding: 7px 9px;
+	border-radius: 6px;
+	background: rgba(138, 147, 166, 0.14);
+	font-size: 10.5px;
+	color: #8a93a6;
+}
