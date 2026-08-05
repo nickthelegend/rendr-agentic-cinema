@@ -11,6 +11,7 @@ import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
+import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
 import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
@@ -22,6 +23,8 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 	const graph = state.cinemaGraphs.find((entry) => entry.id === state.activeCinemaGraphId);
 
 	const [running, setRunning] = useState(false);
+	const [checks, setChecks] = useState<CheckResult[] | null>(null);
+	const [checking, setChecking] = useState(false);
 	const notice = useCallback(
 		(message: string, tone?: "error" | "info") =>
 			toast(message, tone === "error" ? "error" : undefined),
@@ -48,6 +51,41 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 			</>
 		);
 	}
+
+	/**
+	 * Answers "is it my key, my quota, or the request shape" without leaving
+	 * the app. The same five checks the preflight script runs, because a render
+	 * that fails is exactly when nobody wants to go and find a terminal.
+	 */
+	const testConnection = useCallback(async () => {
+		if (checking) return;
+		const key = import.meta.env.VITE_GEMINI_API_KEY ?? "";
+		if (!key) {
+			setChecks([
+				{
+					name: "api key",
+					ok: false,
+					detail: "No VITE_GEMINI_API_KEY in .env.local. Get one from aistudio.google.com — that is a different product from a Gemini app subscription, which carries no API quota.",
+				},
+			]);
+			return;
+		}
+		setChecking(true);
+		setChecks(null);
+		try {
+			setChecks(await checkConnection(createGeminiProvider(key)));
+		} catch (error) {
+			setChecks([
+				{
+					name: "connection",
+					ok: false,
+					detail: error instanceof Error ? error.message : String(error),
+				},
+			]);
+		} finally {
+			setChecking(false);
+		}
+	}, [checking]);
 
 	const issues = graphIssues(graph);
 	const ready = issues.length === 0 && graph.nodes.length > 0;
@@ -123,6 +161,15 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 				</button>
 				<button
 					type="button"
+					className="pmr-button"
+					disabled={checking}
+					title={`Check the key and the request shape against ${CHECK_MODELS()}`}
+					onClick={testConnection}
+				>
+					{checking ? "Checking…" : "Test connection"}
+				</button>
+				<button
+					type="button"
 					className="pmr-button pmr-button--primary"
 					disabled={running || pending === 0}
 					title={
@@ -135,6 +182,33 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					{running ? "Rendering…" : pending ? `Render ${pending}` : "Up to date"}
 				</button>
 			</PanelHeader>
+
+			{checks ? (
+				<div className="cin-checks">
+					<div className="cin-checks__head">
+						<strong>Connection</strong>
+						<span>{CHECK_MODELS()}</span>
+						<button
+							type="button"
+							className="pmr-button"
+							onClick={() => setChecks(null)}
+						>
+							Close
+						</button>
+					</div>
+					{checks.map((check) => (
+						<p
+							key={check.name}
+							className="cin-checks__row"
+							data-ok={check.ok || undefined}
+						>
+							<span>{check.ok ? "✓" : "✕"}</span>
+							<strong>{check.name}</strong>
+							<em>{check.detail}</em>
+						</p>
+					))}
+				</div>
+			) : null}
 
 			<div className="cin-shell">
 				<CinemaCanvas

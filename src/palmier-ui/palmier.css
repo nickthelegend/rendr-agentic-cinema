@@ -3732,3 +3732,43 @@
 	font-size: 10.5px;
 	color: #8a93a6;
 }
+
+/* The connection report. Sits above the canvas rather than in a toast: it is
+   five lines of detail somebody needs to read and compare, and a toast that
+   vanishes is the wrong container for a diagnostic. */
+.cin-checks {
+	padding: 9px 12px 11px;
+	border-bottom: 1px solid var(--pmr-border, #1e2635);
+	background: var(--pmr-bg-raised, #141a26);
+	font-size: 11.5px;
+}
+.cin-checks__head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 7px;
+}
+.cin-checks__head span {
+	flex: 1;
+	font-family: ui-monospace, Menlo, monospace;
+	font-size: 10px;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-checks__row {
+	display: grid;
+	grid-template-columns: 14px 128px 1fr;
+	gap: 8px;
+	margin: 0 0 3px;
+	align-items: baseline;
+}
+.cin-checks__row > span {
+	color: #f2555a;
+	font-weight: 700;
+}
+.cin-checks__row[data-ok] > span {
+	color: #3fc79a;
+}
+.cin-checks__row em {
+	font-style: normal;
+	color: var(--pmr-text-muted, #9aa6bd);
+}
