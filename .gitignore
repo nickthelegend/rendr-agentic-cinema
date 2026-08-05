@@ -56,3 +56,5 @@ vendor/walletchan/
 # Credentials — never committed
 .env.local
 .env*.local
+
+preflight-out/

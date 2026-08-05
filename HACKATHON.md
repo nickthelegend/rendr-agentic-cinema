@@ -56,3 +56,24 @@ the plan. Decide this before building anything else.
 The niche. This repo is a clone of the recorder so the work can start from
 something that already runs end to end, not a commitment to keep every part of
 it. Recording may well not be the product here — generating cinema is.
+
+## Before trusting anything generative
+
+```bash
+GEMINI_API_KEY=... npm run preflight
+```
+
+Four checks against the real API, because every test in this repo runs against
+a fake provider — which proves the sequencing and the parsing and proves
+nothing about the request shape. The shape is exactly where this kind of
+project breaks: the fields are guessable, and a wrong guess is *ignored* rather
+than rejected, so a shot comes back the wrong size and nothing says why.
+
+It checks that the text model answers, that structured output is honoured (the
+story decomposition is unusable without it), that an image comes back, that
+`aspect_ratio` actually changed the dimensions — measured off the PNG header,
+not assumed — and that attaching an image as context is accepted, which is the
+mechanism the entire character-consistency argument rests on.
+
+It writes the images to `preflight-out/`. Look at them. A tick means the API
+returned bytes, not that the bytes are any good.

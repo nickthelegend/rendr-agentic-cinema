@@ -80,13 +80,17 @@ export class ProviderError extends Error {
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
-/** Text and reasoning. */
-export const TEXT_MODEL = "gemini-2.5-flash";
 /**
- * Images. Chosen specifically for holding a subject across generations, which
- * is the one property this whole project depends on.
+ * Model ids, checked against the published list rather than remembered.
+ *
+ * gemini-2.5-flash-image, which this used first, is now the previous
+ * generation — still available, but Nano Banana 2 is the current image model
+ * and is the one being improved. Both are overridable from the environment,
+ * because a model id is the thing most likely to go stale between now and
+ * anyone running this.
  */
-export const IMAGE_MODEL = "gemini-2.5-flash-image";
+export const TEXT_MODEL = import.meta.env?.VITE_GEMINI_TEXT_MODEL ?? "gemini-3.6-flash";
+export const IMAGE_MODEL = import.meta.env?.VITE_GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image";
 
 function classify(status: number, body: string): ProviderError {
 	if (status === 401 || status === 403) {
@@ -199,12 +203,20 @@ export function createGeminiProvider(apiKey: string): CinemaProvider {
 				{ text: request.prompt },
 			];
 
+			// Aspect goes in response_format, not generationConfig.imageConfig —
+			// the latter was a guess and is not a field the API has, so it was
+			// being ignored and every shot would have come back square-ish
+			// whatever the node asked for.
+			//
+			// Seed is deliberately absent: the REST image API does not document
+			// one, so passing it achieves nothing. Consistency here comes from
+			// attaching the character sheet, which is the mechanism that actually
+			// works — the seed was only ever a second line of defence.
 			const payload = await post(IMAGE_MODEL, {
 				contents: [{ role: "user", parts }],
-				generationConfig: {
-					...(request.seed !== undefined ? { seed: request.seed } : {}),
-					...(request.aspect ? { imageConfig: { aspectRatio: request.aspect } } : {}),
-				},
+				...(request.aspect
+					? { response_format: { type: "image", aspect_ratio: request.aspect } }
+					: {}),
 			});
 
 			const candidates = payload.candidates as
@@ -228,6 +240,9 @@ export function createGeminiProvider(apiKey: string): CinemaProvider {
 				image: { base64: inline.data, mimeType: inline.mimeType ?? "image/png" },
 				model: IMAGE_MODEL,
 				elapsedMs: Date.now() - started,
+				// Echoed back for the ledger even though the API ignores it: it
+				// still identifies which character description produced this, and
+				// that is what a rerun needs to match on.
 				seed: request.seed,
 			};
 		},

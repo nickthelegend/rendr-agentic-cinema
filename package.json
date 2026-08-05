@@ -45,7 +45,8 @@
     "mcp:bridge": "node mcpb/server/index.js",
     "demo:record": "node scripts/record-demo.mjs",
     "demo:build": "node scripts/build-demo.mjs",
-    "dev:ui": "vite --config vite.ui.config.ts"
+    "dev:ui": "vite --config vite.ui.config.ts",
+    "preflight": "node scripts/preflight.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
