@@ -97,9 +97,22 @@ export function starterGraph(name = "Untitled film"): CinemaGraph {
 	});
 
 	const nodes: CinemaNode[] = [
-		node("character", 60, 40, { label: "Lead" }),
-		node("world", 60, 210),
-		node("beat", 60, 350, { label: "Opening beat" }),
+		// Seeded with real text, not just labels. A starter graph whose Beat is
+		// empty cannot run at all — the story has nothing to decompose — so the
+		// first thing a new film does is fail. These are meant to be typed over,
+		// and they make Render work on the first click.
+		node("character", 60, 40, {
+			label: "Lead",
+			text: "A dock worker in her fifties, tired, careful with her hands.",
+		}),
+		node("world", 60, 210, {
+			label: "World",
+			text: "A rain-dark port town at night. Sodium light, long lenses.",
+		}),
+		node("beat", 60, 350, {
+			label: "Opening beat",
+			text: "She waits under an awning and unfolds a letter she has read before.",
+		}),
 		node("story", 320, 180, { params: { targetSeconds: 30 } }),
 		{ ...node("scene", 570, 100, { label: "Shot 1" }), id: `${id}-scene` },
 		{

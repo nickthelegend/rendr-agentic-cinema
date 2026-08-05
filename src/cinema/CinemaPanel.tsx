@@ -15,6 +15,7 @@ import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, runGraph } from "./run";
+import { createStubProvider } from "./stubProvider";
 
 export function CinemaPanel({ api }: { api: EditorApi }) {
 	const { state, toast } = api;
@@ -58,17 +59,19 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 	const run = useCallback(
 		async (only?: string[]) => {
 			if (running) return;
+			// No key falls back to the stub rather than refusing. The pipeline is
+			// worth exercising without quota, and the stub paints "STUB" into
+			// every frame so a placeholder cannot be mistaken for a render.
 			const key = import.meta.env.VITE_GEMINI_API_KEY ?? "";
+			const provider = key ? createGeminiProvider(key) : createStubProvider();
 			if (!key) {
 				notice(
-					"No Gemini key. Put VITE_GEMINI_API_KEY in .env.local — an AI Studio key, not a Gemini app subscription.",
-					"error",
+					"No API key — running the local stub. Frames are placeholders. Put VITE_GEMINI_API_KEY in .env.local for the real thing.",
 				);
-				return;
 			}
 			setRunning(true);
 			try {
-				const report = await runGraph(createGeminiProvider(key), graph, {
+				const report = await runGraph(provider, graph, {
 					only,
 					// Progress is written straight back to the graph, so the canvas
 					// shows a node going running → ready while the rest still wait.
