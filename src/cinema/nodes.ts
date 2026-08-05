@@ -173,8 +173,17 @@ export interface CinemaNode {
 export interface NodeOutput {
 	/** Media this node produced, as library asset ids. */
 	assetIds?: string[];
-	/** The character sheet: the same face from several angles. */
+	/** The character sheet as library asset ids, for showing in the UI. */
 	sheetAssetIds?: string[];
+	/**
+	 * The sheet as bytes, which is what a scene actually attaches.
+	 *
+	 * Kept beside the asset ids rather than replacing them: the UI wants
+	 * something it can put in an <img>, and the provider wants base64. Deriving
+	 * one from the other on every scene render would mean a fetch per character
+	 * per shot.
+	 */
+	sheet?: Array<{ base64: string; mimeType: string }>;
 	/** Text this node produced — beats, a prompt, a description. */
 	text?: string;
 	/** Structured scenes, when a story decomposed. */
