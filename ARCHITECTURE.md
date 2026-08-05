@@ -197,13 +197,6 @@ before the deadline.
 
 Kept here rather than in a commit message, because these are open.
 
-**The palette still does not fit.** Two columns took it from three visible
-node kinds to four, and there are eleven. Character, Story and Scene — the
-three a film cannot exist without — are below the fold in a short editor pane
-and reachable only by a scroll nobody would think to try. Denser type will not
-close a gap this size; the palette probably wants to be a wrapping strip along
-the top of the canvas rather than a left column, or the groups want collapsing.
-
 **Node cards left the accessibility tree.** They appeared as anonymous `group`
 entries before the aria-label was added and do not appear at all after it,
 which suggests the label went somewhere the tree does not read. A canvas whose

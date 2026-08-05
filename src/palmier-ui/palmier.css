@@ -3352,43 +3352,55 @@
    status that is legible without being loud. Everything else recedes —
    the nodes carry images, and images lose against a busy chrome. */
 
+/* The palette runs along the top, not down the side.
+   A left column loses: the editor pane is short, eleven node kinds do not fit
+   in it at any type size, and the three that matter most — Character, Story,
+   Scene — were exactly the ones below the fold. Horizontally there is width to
+   spare, and every kind is reachable without a scroll nobody would try. */
 .cin {
 	display: grid;
-	grid-template-columns: 186px 1fr;
-	grid-template-rows: 1fr auto;
+	grid-template-rows: auto 1fr auto;
 	height: 100%;
 	min-height: 0;
 	background: var(--pmr-bg-sunken, #0c0f16);
 }
 
 .cin__palette {
-	grid-row: 1 / -1;
-	overflow-y: auto;
-	padding: 12px 10px 18px;
-	border-right: 1px solid var(--pmr-border, #1e2635);
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 140px);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 5px 16px;
+	padding: 7px 12px;
+	border-bottom: 1px solid var(--pmr-border, #1e2635);
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
 }
 
-.cin__group + .cin__group {
-	margin-top: 16px;
+/* Each group stays a labelled run of chips, so the four stages still read as
+   four stages rather than one undifferentiated row. */
+.cin__group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
 
 .cin__group-name {
-	margin: 0 0 7px 2px;
-	font-size: 10px;
+	margin: 0 2px 0 0;
+	font-size: 9px;
 	font-weight: 700;
-	letter-spacing: 0.13em;
+	letter-spacing: 0.11em;
 	text-transform: uppercase;
-	opacity: 0.85;
+	opacity: 0.75;
+}
+
+.cin__group-items {
+	display: contents;
 }
 
 .cin__add {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 3px;
-	width: 100%;
-	padding: 6px 7px;
+	gap: 4px;
+	padding: 5px 9px;
 	border: 1px solid var(--pmr-border, #1e2635);
 	border-left: 3px solid var(--tint);
 	border-radius: 7px;
@@ -3403,7 +3415,7 @@
 		border-color 0.12s ease;
 }
 .cin__add:hover {
-	transform: translateX(2px);
+	transform: translateY(-1px);
 	background: color-mix(in srgb, var(--tint) 12%, var(--pmr-bg-raised, #141a26));
 	border-color: color-mix(in srgb, var(--tint) 45%, transparent);
 }
@@ -3566,7 +3578,6 @@
 }
 
 .cin__issues {
-	grid-column: 2;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
