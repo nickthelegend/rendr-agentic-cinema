@@ -25,6 +25,16 @@ function hash(text: string): number {
 
 const PALETTE = ["#2E4057", "#48A9A6", "#4B3F72", "#7D4E57", "#3D5A6C", "#5C6672"];
 
+/**
+ * A labelled placeholder card, as a PNG.
+ *
+ * PNG rather than SVG, which is what this drew first. The media library accepts
+ * PNG, JPEG and HEIC, so an SVG placeholder imported as nothing and the whole
+ * commit refused — the stub was producing something the rest of the app could
+ * not accept, which made it useless for testing the one path it exists to test.
+ * Real providers return PNG anyway, so this is also closer to the thing it
+ * stands in for.
+ */
 function placeholder(prompt: string, aspect: string, seed: number): ImageBytes {
 	const [w, h] =
 		aspect === "9:16"
@@ -34,39 +44,55 @@ function placeholder(prompt: string, aspect: string, seed: number): ImageBytes {
 				: aspect === "1:1"
 					? [800, 800]
 					: [960, 540];
-	const tint = PALETTE[seed % PALETTE.length];
-	// Wrapped by hand: an SVG <text> does not wrap, and a single long line
-	// running off the card tells you nothing about what was asked for.
-	const words = prompt.split(/\s+/);
-	const lines: string[] = [];
+
+	const canvas = document.createElement("canvas");
+	canvas.width = w;
+	canvas.height = h;
+	const context = canvas.getContext("2d");
+	if (!context) {
+		// A 1x1 transparent PNG, so a caller still gets bytes it can import.
+		return {
+			base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+			mimeType: "image/png",
+		};
+	}
+
+	context.fillStyle = PALETTE[seed % PALETTE.length];
+	context.fillRect(0, 0, w, h);
+	context.strokeStyle = "rgba(255,255,255,.28)";
+	context.lineWidth = 2;
+	context.setLineDash([10, 8]);
+	context.strokeRect(12, 12, w - 24, h - 24);
+
+	context.fillStyle = "rgba(255,255,255,.92)";
+	context.font = "700 26px monospace";
+	context.fillText("STUB · no model was called", 26, 52);
+
+	// Wrapped by hand: canvas fillText does not wrap, and one long line running
+	// off the card tells you nothing about what was asked for.
+	context.font = "17px monospace";
+	context.fillStyle = "rgba(255,255,255,.74)";
 	let line = "";
-	for (const word of words) {
-		if ((line + word).length > 42) {
-			lines.push(line.trim());
+	let y = 104;
+	for (const word of prompt.split(/\s+/)) {
+		if ((line + word).length > 46) {
+			context.fillText(line.trim(), 26, y);
 			line = "";
-			if (lines.length >= 7) break;
+			y += 26;
+			if (y > h - 60) break;
 		}
 		line += `${word} `;
 	}
-	if (line.trim() && lines.length < 8) lines.push(line.trim());
+	if (line.trim() && y <= h - 60) context.fillText(line.trim(), 26, y);
 
-	const escaped = (text: string) =>
-		text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	context.font = "15px monospace";
+	context.fillStyle = "rgba(255,255,255,.5)";
+	context.fillText(`seed ${seed}`, 26, h - 24);
 
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-<rect width="${w}" height="${h}" fill="${tint}"/>
-<rect x="12" y="12" width="${w - 24}" height="${h - 24}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2" stroke-dasharray="10 8"/>
-<text x="26" y="52" fill="rgba(255,255,255,.9)" font-family="monospace" font-size="26" font-weight="700">STUB · no model was called</text>
-${lines
-	.map(
-		(text, index) =>
-			`<text x="26" y="${104 + index * 26}" fill="rgba(255,255,255,.72)" font-family="monospace" font-size="17">${escaped(text)}</text>`,
-	)
-	.join("\n")}
-<text x="26" y="${h - 24}" fill="rgba(255,255,255,.5)" font-family="monospace" font-size="15">seed ${seed}</text>
-</svg>`;
-
-	return { base64: btoa(unescape(encodeURIComponent(svg))), mimeType: "image/svg+xml" };
+	return {
+		base64: canvas.toDataURL("image/png").split(",")[1] ?? "",
+		mimeType: "image/png",
+	};
 }
 
 /**

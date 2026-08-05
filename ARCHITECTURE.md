@@ -205,6 +205,8 @@ accepts our request shape:
   four. That chain is the reason the graph exists, and it holds.
 - Undo steps the graph back and the canvas follows it.
 - Illegal connections are refused with the reason.
+- "To timeline" puts the rendered scenes on V1 as clips with camera moves, and
+  the project duration matches what the story asked for.
 
 `Test connection` covers the rest, and needs a key.
 
@@ -221,14 +223,6 @@ coordinates.
 **Reloading loses the graph.** Cinema graphs live in memory until the project
 is saved, so a refresh during development starts over. Fine for a save-backed
 app, surprising while iterating.
-
-**Scenes do not reach the timeline yet.** src/cinema/commit.ts works out what
-to place, in what order, with which camera move, and skips a scene that has not
-rendered *by name* rather than quietly dropping it. What it does not have is
-the editor calls: placing a clip goes through a timeline reducer rather than
-anything on the api surface, and wiring that wants doing properly rather than
-at the end of a session. This is the last step between a graph that renders and
-a cut you can edit, and it is the most valuable thing left.
 
 **Nothing has called the real API.** Every generative path is exercised against
 the stub. `npm run preflight` is the check that closes this, and it needs a key.

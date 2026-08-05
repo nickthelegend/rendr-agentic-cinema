@@ -6,16 +6,18 @@
 // editor's state.
 
 import { useCallback, useEffect, useState } from "react";
-
+import { withDefaults } from "../palmier-ui/model";
 import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
+import { readyScenes } from "./commit";
 import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, runGraph } from "./run";
+import { moveFor } from "./scene";
 import { createStubProvider } from "./stubProvider";
 
 export function CinemaPanel({ api }: { api: EditorApi }) {
@@ -104,9 +106,170 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, [api]);
 
+	/**
+	 * Lands the rendered scenes on the timeline.
+	 *
+	 * The point of the whole thing: what comes out is a cut you can edit rather
+	 * than a folder of images. Everything here goes through the editor's own
+	 * calls — placeAsset, then one commit for the durations and the camera
+	 * moves, so the whole placement is a single undo step rather than a dozen.
+	 */
+	const commitToCut = useCallback(async () => {
+		const ready = readyScenes(graph);
+		if (ready.length === 0) {
+			notice("Nothing to place — render some scenes first.", "error");
+			return;
+		}
+		const fps = api.timeline.fps;
+
+		const files = ready.map((entry, index) => {
+			const binary = atob(entry.image.base64);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+			const ext = entry.image.mimeType.includes("svg") ? "svg" : "png";
+			return new File([bytes], `Scene ${index + 1}.${ext}`, { type: entry.image.mimeType });
+		});
+		const assets = await api.importMedia(files);
+		if (assets.length !== files.length) {
+			// Placing some of them would leave a cut that looks complete and is
+			// missing shots, which is worse than placing none.
+			notice(
+				`Only ${assets.length} of ${files.length} stills imported — nothing placed.`,
+				"error",
+			);
+			return;
+		}
+
+		const placements: Array<{ clipId: string; start: number; frames: number; index: number }> =
+			[];
+		let cursor = 0;
+		for (const [index, entry] of ready.entries()) {
+			const frames = Math.max(1, Math.round(entry.spec.durationSeconds * fps));
+			api.placeAsset(assets[index].id, cursor);
+			// placeAsset mints this id from the asset and the frame, so it can be
+			// computed rather than read back.
+			placements.push({
+				clipId: `clip-${assets[index].id}-${cursor}`,
+				start: cursor,
+				frames,
+				index,
+			});
+			cursor += frames;
+		}
+
+		// One commit for every duration and move, so the whole placement undoes
+		// as a single step rather than as fifteen.
+		api.commit("Place scenes", (current) => {
+			// Everything in one commit: the clips, their lengths and their moves,
+			// so placing a cut is a single undo rather than fifteen.
+			const videoIndex = current.tracks.findIndex((track) => track.kind === "video");
+			let next = {
+				...current,
+				tracks: current.tracks.map((track, index) =>
+					index !== videoIndex
+						? track
+						: {
+								...track,
+								clips: [
+									...track.clips,
+									...placements.map((placement, at) =>
+										withDefaults({
+											id: placement.clipId,
+											name: `Scene ${at + 1}`,
+											mediaType: "image" as const,
+											assetId: assets[at].id,
+											startFrame: placement.start,
+											endFrame: placement.start + placement.frames,
+										}),
+									),
+								].sort((a, b) => a.startFrame - b.startFrame),
+							},
+				),
+			};
+			for (const placement of placements) {
+				const move = moveFor(ready[placement.index].spec);
+				const headroom = 1 + move.amount;
+				// A compass direction pans; "in" and "out" hold centre and scale.
+				const PAN: Record<string, [number, number]> = {
+					left: [-1, 0],
+					right: [1, 0],
+					up: [0, -1],
+					down: [0, 1],
+				};
+				const pan = PAN[move.direction] ?? [0, 0];
+				const zooming = move.direction === "in" || move.direction === "out";
+				next = {
+					...next,
+					tracks: next.tracks.map((track) => ({
+						...track,
+						clips: track.clips.map((clip) => {
+							if (clip.id !== placement.clipId) return clip;
+							const last = Math.max(1, placement.frames - 1);
+							return {
+								...clip,
+								keyframes: {
+									...clip.keyframes,
+									scale: [
+										{
+											frame: 0,
+											values:
+												zooming && move.direction === "out"
+													? [headroom, headroom]
+													: [1, 1],
+											interp: "smooth" as const,
+										},
+										{
+											frame: last,
+											values:
+												zooming && move.direction === "in"
+													? [headroom, headroom]
+													: [1, 1],
+											interp: "smooth" as const,
+										},
+									],
+									position: [
+										{
+											frame: 0,
+											values: [
+												0.5 - (pan[0] * move.amount) / 2,
+												0.5 - (pan[1] * move.amount) / 2,
+											],
+											interp: "smooth" as const,
+										},
+										{
+											frame: last,
+											values: [
+												0.5 + (pan[0] * move.amount) / 2,
+												0.5 + (pan[1] * move.amount) / 2,
+											],
+											interp: "smooth" as const,
+										},
+									],
+								},
+							};
+						}),
+					})),
+				};
+			}
+			return next;
+		});
+
+		for (const [index, entry] of ready.entries()) {
+			if (entry.spec.dialogue) {
+				// A note, not burnt-in text: narrate_timeline speaks it and the
+				// captions are cut from it, so it stays editable.
+				api.addComment({ frame: placements[index].start + 2, text: entry.spec.dialogue });
+			}
+		}
+
+		notice(`${ready.length} scene(s) on the timeline — ${(cursor / fps).toFixed(1)}s.`);
+		api.setActiveCinemaGraph(null);
+	}, [api, graph, notice]);
+
 	const issues = graphIssues(graph);
 	const ready = issues.length === 0 && graph.nodes.length > 0;
 	const pending = estimateRun(graph);
+	const placeable = readyScenes(graph).length;
 
 	// The run is driven here rather than inside the canvas: the canvas draws a
 	// graph, and giving it the ability to spend money would mean every future
@@ -192,6 +355,19 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 					onClick={testConnection}
 				>
 					{checking ? "Checking…" : "Test connection"}
+				</button>
+				<button
+					type="button"
+					className="pmr-button"
+					disabled={placeable === 0}
+					title={
+						placeable === 0
+							? "Render some scenes first."
+							: `Place ${placeable} scene(s)`
+					}
+					onClick={commitToCut}
+				>
+					{placeable ? `To timeline (${placeable})` : "To timeline"}
 				</button>
 				<button
 					type="button"
