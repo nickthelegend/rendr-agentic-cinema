@@ -12,6 +12,13 @@
 // same keyframes a hand edit would use.
 
 import { sceneReference, sheetsFor } from "./character";
+import {
+	craftClauses,
+	lightingFromTime,
+	negativeClause,
+	type ShotCraft,
+	sizeFromCamera,
+} from "./craft";
 import type { CinemaGraph, SceneSpec } from "./nodes";
 import type { CinemaProvider, ImageBytes } from "./provider";
 
@@ -33,11 +40,35 @@ export interface RenderedScene {
  * full description beside a photograph gives the model two sources for one face
  * and lets the words win.
  */
-export function buildScenePrompt(graph: CinemaGraph, spec: SceneSpec, world?: string): string {
+export function buildScenePrompt(
+	graph: CinemaGraph,
+	spec: SceneSpec,
+	world?: string,
+	craft: ShotCraft = {},
+): string {
 	const cast = spec.characterIds
 		.map((id) => graph.nodes.find((node) => node.id === id))
 		.filter((node): node is NonNullable<typeof node> => Boolean(node))
 		.map((node) => sceneReference(node));
+
+	// Inferred, then overridden. The decomposition writes camera directions as
+	// prose because forcing an enum on the model produces worse writing; reading
+	// the craft back out of that prose gets the vocabulary for free, and an
+	// explicit choice on the node still wins.
+	//
+	// The undefined keys are stripped first, and that is not tidiness. A plain
+	// spread of a craft object whose unset fields are explicitly `undefined`
+	// overwrites the inference with `undefined` — which is what it did, and the
+	// result was that no craft clause of any kind ever reached a prompt while
+	// every control looked wired.
+	const chosen = Object.fromEntries(
+		Object.entries(craft).filter(([, value]) => value !== undefined),
+	) as ShotCraft;
+	const resolved: ShotCraft = {
+		size: sizeFromCamera(spec.camera),
+		lighting: lightingFromTime(spec.timeOfDay),
+		...chosen,
+	};
 
 	return [
 		`${spec.camera}.`,
@@ -45,7 +76,9 @@ export function buildScenePrompt(graph: CinemaGraph, spec: SceneSpec, world?: st
 		cast.length ? `In frame: ${cast.join("; ")}.` : null,
 		`${spec.location}, ${spec.timeOfDay}.`,
 		world ? world : null,
-		"Cinematic still, filmic colour, natural light, shallow depth of field. No text, no watermark, no border.",
+		...craftClauses(resolved),
+		"Cinematic still, filmic colour, shallow depth of field.",
+		negativeClause(resolved),
 	]
 		.filter(Boolean)
 		.join(" ");
@@ -55,9 +88,14 @@ export async function renderScene(
 	provider: CinemaProvider,
 	graph: CinemaGraph,
 	spec: SceneSpec,
-	options: { world?: string; aspect?: "16:9" | "9:16" | "1:1" | "4:5"; seed?: number } = {},
+	options: {
+		world?: string;
+		aspect?: "16:9" | "9:16" | "1:1" | "4:5";
+		seed?: number;
+		craft?: ShotCraft;
+	} = {},
 ): Promise<RenderedScene> {
-	const prompt = buildScenePrompt(graph, spec, options.world);
+	const prompt = buildScenePrompt(graph, spec, options.world, options.craft);
 	// One view per character, which is what stops a three-hander arriving with
 	// twelve images and the model averaging the faces.
 	const references = sheetsFor(graph, spec.characterIds);

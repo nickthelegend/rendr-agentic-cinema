@@ -8,7 +8,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { CRAFT_OPTIONS } from "./craft";
+import { duplicateNode } from "./graphOps";
 import type { Ledger, LedgerRow } from "./ledger";
+import { VOICES } from "./sound";
 
 type PromptScore = Awaited<ReturnType<Ledger["whatWorks"]>>[number];
 
@@ -189,6 +192,20 @@ export function CinemaInspector({
 		<div className="cin-insp">
 			<header className="cin-insp__head">
 				<h3>{spec?.label}</h3>
+				{/* Duplicate carries the wires feeding the node, which is the only
+				    thing that makes it worth having — a second take on a shot
+				    against the same cast and story, without four drags. */}
+				<button
+					type="button"
+					className="pmr-button"
+					title="Copy this node and the wires feeding it."
+					onClick={() => {
+						onChange(duplicateNode(graph, node.id));
+						onNotice(`Duplicated ${node.label ?? spec?.label}.`);
+					}}
+				>
+					Duplicate
+				</button>
 				{spec?.generative ? (
 					<button
 						type="button"
@@ -282,6 +299,97 @@ export function CinemaInspector({
 						</small>
 					</label>
 				</>
+			) : null}
+
+			{node.kind === "scene" ? (
+				<div className="cin-insp__craft">
+					<span className="cin-insp__label">Craft</span>
+					{/* Every one of these is optional and every one is inferred from
+					    the shot's own prose when left alone — so the panel is a way
+					    to override a decision, not a form to fill in before
+					    anything will render. */}
+					{(
+						[
+							["size", "Shot size"],
+							["composition", "Composition"],
+							["lens", "Lens"],
+							["lighting", "Light"],
+							["stock", "Stock"],
+						] as const
+					).map(([key, label]) => (
+						<label key={key} className="cin-insp__field">
+							<span>{label}</span>
+							<select
+								value={(node.params[key] as string) ?? ""}
+								onChange={(event) => param(key, event.target.value || undefined)}
+							>
+								<option value="">from the shot</option>
+								{CRAFT_OPTIONS[key].map((option) => (
+									<option key={option} value={option}>
+										{option}
+									</option>
+								))}
+							</select>
+						</label>
+					))}
+					<label className="cin-insp__field">
+						<span>Hold the face</span>
+						<input
+							type="range"
+							min={0}
+							max={1}
+							step={0.05}
+							value={(node.params.referenceStrength as number) ?? 0.9}
+							onChange={(event) =>
+								param("referenceStrength", Number(event.target.value))
+							}
+						/>
+						<small>
+							How hard to hold the character sheet. Lower it if a shot keeps coming
+							back stiff.
+						</small>
+					</label>
+					<label className="cin-insp__field">
+						<span>Keep out</span>
+						<input
+							value={(node.params.negative as string) ?? ""}
+							placeholder="modern cars, visible logos"
+							onChange={(event) => param("negative", event.target.value)}
+						/>
+					</label>
+				</div>
+			) : null}
+
+			{node.kind === "world" ? (
+				<label className="cin-insp__field">
+					<span>Palette</span>
+					<input
+						value={(node.params.palette as string) ?? ""}
+						placeholder="rust, sea green, bone"
+						onChange={(event) => param("palette", event.target.value)}
+					/>
+					<small>
+						Applied to every shot that has no palette of its own. One palette across a
+						film is most of why its shots cut together.
+					</small>
+				</label>
+			) : null}
+
+			{node.kind === "character" ? (
+				<label className="cin-insp__field">
+					<span>Voice</span>
+					<select
+						value={(node.params.voice as string) ?? ""}
+						onChange={(event) => param("voice", event.target.value || undefined)}
+					>
+						<option value="">from the description</option>
+						{Object.entries(VOICES).map(([key, description]) => (
+							<option key={key} value={key}>
+								{key} — {description}
+							</option>
+						))}
+					</select>
+				</label>
 			) : null}
 
 			{node.kind === "story" ? (

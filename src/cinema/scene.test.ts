@@ -186,3 +186,56 @@ describe("plannedDuration", () => {
 		).toBe(7.5);
 	});
 });
+
+describe("craft in the prompt", () => {
+	const g = (): CinemaGraph => ({ id: "g", name: "T", auto: false, nodes: [], edges: [] });
+	const spec = (over: Partial<SceneSpec> = {}): SceneSpec => ({
+		id: "s0",
+		index: 0,
+		characterIds: [],
+		location: "a street",
+		timeOfDay: "night",
+		camera: "wide establishing, static",
+		action: "the street empties",
+		durationSeconds: 4,
+		...over,
+	});
+
+	it("infers framing and light from the shot's own prose", () => {
+		const out = buildScenePrompt(g(), spec());
+		expect(out).toContain("wide establishing shot");
+		expect(out).toContain("moonlight");
+	});
+
+	it("keeps the inference when the caller passes unset craft", () => {
+		// The bug this pins: a craft object whose unset fields are explicitly
+		// `undefined` — which is exactly what reading them off node.params
+		// produces — spread over the inference and wiped it. Every control
+		// looked wired and no craft clause of any kind reached a prompt.
+		const out = buildScenePrompt(g(), spec(), undefined, {
+			size: undefined,
+			lens: undefined,
+			lighting: undefined,
+			stock: undefined,
+		});
+		expect(out).toContain("wide establishing shot");
+		expect(out).toContain("moonlight");
+	});
+
+	it("lets an explicit choice win over the inference", () => {
+		const out = buildScenePrompt(g(), spec(), undefined, { size: "close", lens: "85mm" });
+		expect(out).toContain("close-up");
+		expect(out).toContain("85mm");
+		expect(out).not.toContain("wide establishing shot");
+	});
+
+	it("always forbids the artefacts that make a still unusable", () => {
+		expect(buildScenePrompt(g(), spec())).toContain("no watermark");
+	});
+
+	it("carries a palette so shots from one film cut together", () => {
+		expect(buildScenePrompt(g(), spec(), undefined, { palette: "rust, bone" })).toContain(
+			"Colour palette: rust, bone.",
+		);
+	});
+});

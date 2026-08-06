@@ -221,6 +221,38 @@ Then, driving it against a local server speaking the Clickhouse wire protocol:
 
 `Test connection` covers the rest, and needs a key.
 
+## The shot vocabulary
+
+A prompt box is the wrong interface for cinematography. A director does not
+type "make it cinematic"; they say 85mm, low key, golden hour, over the
+shoulder. That is a small closed vocabulary with real meaning, and `craft.ts`
+puts it in the app rather than in the user's head — ten shot sizes, seven
+lenses, ten lighting setups, seven stocks, eight compositions, a film-wide
+palette, a negative prompt and a reference-strength control.
+
+Each is inferred from the shot's own prose first and overridden only if you
+want it to be, so the decomposition keeps writing camera directions as
+sentences and the vocabulary comes free. The clauses are assembled in a fixed
+order — framing, optics, light, stock, palette — which is roughly the order in
+which each constrains the next, and models weight earlier tokens more.
+
+The point is that any prompt can be read back and explained. Prompt
+construction is where a generative app quietly rots: every feature adds a
+clause, nobody can tell which clause did what, and the whole thing becomes
+folklore.
+
+## Notes before the render
+
+The expensive part is generating, so every judgement that can be made first
+should be. `structure.ts` reads a decomposed cut and gives the notes an editor
+would: every shot is the same size, nothing establishes, nothing is close, a
+line is spoken with nobody shown hearing it, the cut is a metronome, a held
+frame has no reason, the runtime missed its target. `graphOps.preflight` is
+the stricter half — it refuses a run rather than warning beside a button that
+spends money anyway.
+
+None of it calls a model, and all of it is free.
+
 ## Known, found by driving the app
 
 Kept here rather than in a commit message, because these are open.

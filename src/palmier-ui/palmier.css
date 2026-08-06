@@ -3870,3 +3870,36 @@
 	color: var(--pmr-accent);
 	font-style: normal;
 }
+
+/* Notes about a film, shown before anything is rendered. Preflight stops a
+   run; cut notes are advice and never do — so they read differently. */
+.cin-notes {
+	padding: 6px 10px;
+	display: grid;
+	gap: 3px;
+	border-bottom: 1px solid var(--pmr-border);
+}
+.cin-notes p {
+	margin: 0;
+	font-size: 11px;
+	line-height: 1.45;
+}
+.cin-notes__stop {
+	color: #f2555a;
+}
+.cin-notes__note {
+	color: var(--pmr-text-muted, #9aa6bd);
+}
+.cin-notes__note em {
+	font-style: normal;
+	color: var(--pmr-accent);
+	margin-right: 5px;
+	text-transform: uppercase;
+	font-size: 9px;
+	letter-spacing: 0.05em;
+}
+.cin-insp__craft {
+	margin-top: 14px;
+	display: grid;
+	gap: 6px;
+}

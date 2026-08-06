@@ -14,6 +14,7 @@
 //    missing.
 
 import { gatherIngredients, lockCharacter, toNodeOutput, writeDescription } from "./character";
+import type { ShotCraft } from "./craft";
 import {
 	type CinemaGraph,
 	type CinemaNode,
@@ -302,9 +303,26 @@ async function runNode(
 		specs.length - 1,
 	);
 	const world = inputs.find((input) => input.kind === "world")?.output?.text;
+	// Craft comes off the node, and off the film's palette when the node has no
+	// opinion. A palette set once and applied everywhere is the whole reason
+	// shots from one film cut together.
 	const shot = await renderScene(provider, graph, specs[which], {
 		world,
 		aspect: (node.params.aspect as "16:9" | undefined) ?? "16:9",
+		craft: {
+			size: node.params.size as ShotCraft["size"],
+			lens: node.params.lens as ShotCraft["lens"],
+			lighting: node.params.lighting as ShotCraft["lighting"],
+			stock: node.params.stock as ShotCraft["stock"],
+			composition: node.params.composition as ShotCraft["composition"],
+			negative: node.params.negative as string | undefined,
+			referenceStrength: node.params.referenceStrength as number | undefined,
+			palette:
+				(node.params.palette as string | undefined) ??
+				(graph.nodes.find((entry) => entry.kind === "world")?.params.palette as
+					| string
+					| undefined),
+		},
 	});
 	return {
 		sheet: [shot.image],

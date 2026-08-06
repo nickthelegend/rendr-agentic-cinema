@@ -14,13 +14,32 @@ import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
 import { readyScenes } from "./commit";
+import { shotListCsv } from "./deliver";
+import { autoLayout, preflight } from "./graphOps";
 import { createClickhouseLedger, type Ledger } from "./ledger";
 import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
-import { estimateRun, runGraph } from "./run";
+import { estimateRun, needsRun, runGraph } from "./run";
 import { moveFor } from "./scene";
+import { estimateCost } from "./sound";
+import { reviewCut } from "./structure";
 import { createStubProvider } from "./stubProvider";
+
+/**
+ * Hands a file to the browser.
+ *
+ * Object URL rather than a data URI: a shot list for a long film exceeds what
+ * some browsers accept in a URL, and the failure is silent.
+ */
+function download(name: string, type: string, body: string): void {
+	const url = URL.createObjectURL(new Blob([body], { type }));
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = name;
+	link.click();
+	URL.revokeObjectURL(url);
+}
 
 export function CinemaPanel({ api }: { api: EditorApi }) {
 	const { state, toast } = api;
@@ -274,12 +293,33 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 	const pending = estimateRun(graph);
 	const placeable = readyScenes(graph).length;
 
+	// Everything the panel can say without spending anything. The shot list is
+	// the story's own output, so it exists the moment a decomposition has run
+	// and long before any picture has.
+	const shots = graph.nodes.find((entry) => entry.kind === "story")?.output?.scenes ?? [];
+	const problems = preflight(graph);
+	const notes = reviewCut(
+		shots,
+		graph.nodes.find((entry) => entry.kind === "story")?.params.targetSeconds as
+			| number
+			| undefined,
+	);
+	const cost = estimateCost(graph.nodes.filter((entry) => needsRun(entry, false)));
+
 	// The run is driven here rather than inside the canvas: the canvas draws a
 	// graph, and giving it the ability to spend money would mean every future
 	// change to the view has to think about that.
 	const run = useCallback(
 		async (only?: string[]) => {
 			if (running) return;
+			// Preflight refuses rather than warns. Displaying a problem beside a
+			// button that spends money anyway is the worst of both — the note
+			// reads as advice and the money goes.
+			const stopping = preflight(graph);
+			if (stopping.length > 0) {
+				notice(stopping[0], "error");
+				return;
+			}
 			// No key falls back to the stub rather than refusing. The pipeline is
 			// worth exercising without quota, and the stub paints "STUB" into
 			// every frame so a placeholder cannot be mistaken for a render.
@@ -464,18 +504,73 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 				</button>
 				<button
 					type="button"
+					className="pmr-button"
+					title="Lay the graph out in the order it runs."
+					onClick={() => api.updateCinemaGraph(autoLayout(graph))}
+				>
+					Tidy
+				</button>
+				<button
+					type="button"
+					className="pmr-button"
+					disabled={shots.length === 0}
+					title={
+						shots.length
+							? "Download the shot list as a spreadsheet."
+							: "Decompose the story first."
+					}
+					onClick={() => {
+						download(
+							`${graph.name || "film"} shot list.csv`,
+							"text/csv",
+							shotListCsv(graph, shots, api.timeline.fps),
+						);
+					}}
+				>
+					Shot list
+				</button>
+				<button
+					type="button"
 					className="pmr-button pmr-button--primary"
 					disabled={running || pending === 0}
+					// The cost is on the button rather than behind it. A control that
+					// spends money should say how much before it is pressed, not
+					// after — and this is the one number everybody wants.
 					title={
 						pending === 0
 							? "Everything is up to date."
-							: `${pending} node(s) need a model call.`
+							: `${cost.summary}. ${problems.length ? `${problems.length} problem(s) to fix first.` : ""}`
 					}
 					onClick={() => run()}
 				>
-					{running ? "Rendering…" : pending ? `Render ${pending}` : "Up to date"}
+					{running
+						? "Rendering…"
+						: pending
+							? `Render ${pending} · ~$${cost.usd?.toFixed(2)}`
+							: "Up to date"}
 				</button>
 			</PanelHeader>
+
+			{/* Notes about the film, before anything is rendered. Preflight is
+			    what stops a run; the cut notes are advice and never do. Both are
+			    free — the expensive part is the render, so every judgement that
+			    can happen first should. */}
+			{problems.length > 0 || notes.length > 0 ? (
+				<div className="cin-notes">
+					{problems.map((line) => (
+						<p key={line} className="cin-notes__stop">
+							{line}
+						</p>
+					))}
+					{notes.map((note) => (
+						<p key={note.message} className="cin-notes__note">
+							<em>{note.kind}</em>
+							{note.sceneIndex !== undefined ? ` shot ${note.sceneIndex + 1}: ` : " "}
+							{note.message}
+						</p>
+					))}
+				</div>
+			) : null}
 
 			{checks ? (
 				<div className="cin-checks">

@@ -6,6 +6,8 @@
 // through a toast rather than sitting in the menu looking available.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { exportFilm, importFilm } from "../cinema/deliver";
+import { TEMPLATES } from "../cinema/graphOps";
 import { starterGraph } from "../cinema/persist";
 import { can } from "../config/capabilities";
 import { toFcpxml, toXmeml } from "./interchange";
@@ -98,6 +100,23 @@ export function MenuBar({
 							onConfirm: (name) => api.addCinemaGraph(starterGraph(name)),
 						}),
 				},
+				// One item per template rather than a submenu. The menu has no
+				// submenu machinery, and four extra lines is cheaper than
+				// building some — and reads faster than a picker anyway.
+				...TEMPLATES.map((template) => ({
+					label: `New ${template.name}…`,
+					action: () =>
+						api.askFor({
+							title: `New ${template.name.toLowerCase()}`,
+							label: "Name",
+							initialValue: template.name,
+							confirmLabel: "Create",
+							onConfirm: (name: string) =>
+								api.addCinemaGraph(
+									template.build(`cin-${Date.now().toString(36)}`, name),
+								),
+						}),
+				})),
 				{
 					label: state.activeCinemaGraphId ? "Back to Timeline" : "Films…",
 					disabled: !state.activeCinemaGraphId && state.cinemaGraphs.length === 0,
@@ -105,6 +124,46 @@ export function MenuBar({
 						api.setActiveCinemaGraph(
 							state.activeCinemaGraphId ? null : (state.cinemaGraphs[0]?.id ?? null),
 						),
+				},
+				{
+					label: "Export Film…",
+					disabled: !state.activeCinemaGraphId,
+					action: () => {
+						const film = state.cinemaGraphs.find(
+							(entry) => entry.id === state.activeCinemaGraphId,
+						);
+						if (!film) return;
+						api.downloadText(
+							exportFilm(film),
+							`${film.name.replace(/[/\\?%*:|"<>]/g, "-")}.film.json`,
+							"application/json",
+						);
+					},
+				},
+				{
+					label: "Import Film…",
+					action: () => {
+						// A file input rather than a path: this has to work in the
+						// browser build too, where there is no file system to reach.
+						const input = document.createElement("input");
+						input.type = "file";
+						input.accept = "application/json,.json";
+						input.onchange = async () => {
+							const file = input.files?.[0];
+							if (!file) return;
+							const result = importFilm(
+								await file.text(),
+								`cin-${Date.now().toString(36)}`,
+							);
+							if (result.error || !result.graph) {
+								toast(result.error ?? "That file is not a film.", "error");
+								return;
+							}
+							api.addCinemaGraph(result.graph);
+							toast(`Imported ${result.graph.name}. Nothing is rendered yet.`);
+						};
+						input.click();
+					},
 				},
 				{ separator: true, label: "" },
 				{
