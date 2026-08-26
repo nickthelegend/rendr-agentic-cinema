@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { CRAFT_OPTIONS } from "./craft";
+import { explainPrompt } from "./explain";
 import { duplicateNode } from "./graphOps";
 import type { Ledger, LedgerRow } from "./ledger";
 import { VOICES } from "./sound";
@@ -456,6 +457,22 @@ export function CinemaInspector({
 							</li>
 						))}
 					</ol>
+				</div>
+			) : null}
+
+			{/* What was actually asked, taken apart again. A prompt assembled from
+			    a dozen named pieces and shown as one long sentence is how prompt
+			    engineering turns into folklore — nobody can tell which clause did
+			    what, so every change is superstition. */}
+			{node.output?.prompt ? (
+				<div className="cin-insp__clauses">
+					<span className="cin-insp__label">What was asked</span>
+					{explainPrompt(node.output.prompt).map((clause) => (
+						<p key={`${clause.label}-${clause.text.slice(0, 12)}`}>
+							<em>{clause.label}</em>
+							<span>{clause.text}</span>
+						</p>
+					))}
 				</div>
 			) : null}
 

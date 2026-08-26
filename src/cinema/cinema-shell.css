@@ -1347,3 +1347,64 @@
 	font-style: normal;
 	opacity: 0.75;
 }
+
+/* A prompt, taken apart again. */
+.cin-insp__clauses {
+	margin-top: 16px;
+	display: grid;
+	gap: 4px;
+}
+.cin-insp__clauses p {
+	display: grid;
+	grid-template-columns: 74px 1fr;
+	gap: 8px;
+	margin: 0;
+	font-size: 11px;
+	line-height: 1.4;
+}
+.cin-insp__clauses em {
+	font-style: normal;
+	font-size: 9px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--pmr-text-muted, #8b8b93);
+	padding-top: 1px;
+}
+.cin-insp__clauses span {
+	color: var(--pmr-text, #e7ecf5);
+}
+
+/* The cut's grammar, as counts. */
+.crep__topline {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.crep__hist {
+	display: grid;
+	gap: 5px;
+	margin: 14px 0 4px;
+}
+.crep__hist p {
+	display: grid;
+	grid-template-columns: 96px 1fr 28px;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+.crep__hist i {
+	height: 7px;
+	border-radius: 4px;
+	background: #5b8def;
+	transform-origin: left;
+	display: block;
+}
+.crep__hist em {
+	font-style: normal;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--ink);
+}

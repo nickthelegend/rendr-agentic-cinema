@@ -12,11 +12,14 @@
 import { useEffect, useState } from "react";
 
 import { type CastConsistency, castConsistency, consistencySummary } from "./consistency";
+import { shotSizeHistogram, storyboardHtml } from "./explain";
 import type { Ledger, LedgerInsights } from "./ledger";
 import type { CinemaGraph } from "./nodes";
 
 export interface CinemaReportProps {
 	graph: CinemaGraph;
+	/** Hands the storyboard to the browser. */
+	onDownload: (name: string, type: string, body: string) => void;
 	ledger?: Ledger | null;
 	onClose: () => void;
 }
@@ -74,7 +77,7 @@ function Sheet({ who }: { who: CastConsistency }) {
 	);
 }
 
-export function CinemaReport({ graph, ledger, onClose }: CinemaReportProps) {
+export function CinemaReport({ graph, ledger, onDownload, onClose }: CinemaReportProps) {
 	const [tab, setTab] = useState<"cast" | "ledger">("cast");
 	const [insights, setInsights] = useState<LedgerInsights | null>(null);
 	const [failed, setFailed] = useState(false);
@@ -98,6 +101,20 @@ export function CinemaReport({ graph, ledger, onClose }: CinemaReportProps) {
 	}, [ledger, graph.id, tab]);
 
 	const cast = castConsistency(graph);
+	const shots = graph.nodes.find((node) => node.kind === "story")?.output?.scenes ?? [];
+	const histogram = shotSizeHistogram(shots);
+	const widest = Math.max(1, ...histogram.map((entry) => entry.count));
+
+	// Frames keyed by which shot they render, for the storyboard.
+	const frames = new Map<number, { base64: string; mimeType: string }>();
+	graph.nodes
+		.filter((node) => node.kind === "scene")
+		.forEach((node, fallback) => {
+			const which =
+				typeof node.params.sceneIndex === "number" ? node.params.sceneIndex : fallback;
+			const image = node.output?.sheet?.[0];
+			if (image && !frames.has(which)) frames.set(which, image);
+		});
 
 	// Escape closes it. An overlay without that is a trap on a laptop.
 	useEffect(() => {
@@ -144,7 +161,43 @@ export function CinemaReport({ graph, ledger, onClose }: CinemaReportProps) {
 
 				{tab === "cast" ? (
 					<div className="crep__body">
-						<p className="crep__lede">{consistencySummary(cast)}</p>
+						<div className="crep__topline">
+							<p className="crep__lede">{consistencySummary(cast)}</p>
+							<button
+								type="button"
+								className="crep__close"
+								disabled={shots.length === 0}
+								title={
+									shots.length === 0
+										? "Decompose the story first"
+										: "A printable page of every shot"
+								}
+								onClick={() =>
+									onDownload(
+										`${graph.name || "film"} storyboard.html`,
+										"text/html",
+										storyboardHtml(graph.name, shots, frames),
+									)
+								}
+							>
+								Storyboard
+							</button>
+						</div>
+
+						{histogram.length > 0 ? (
+							<div className="crep__hist">
+								<span className="crep__tag">Shot sizes</span>
+								{histogram.map((entry) => (
+									<p key={entry.size}>
+										<span>{entry.size}</span>
+										<i
+											style={{ transform: `scaleX(${entry.count / widest})` }}
+										/>
+										<em>{entry.count}</em>
+									</p>
+								))}
+							</div>
+						) : null}
 						{cast.length === 0 ? (
 							<p className="crep__none">
 								Add a Character node and run it. The sheet it locks is what every
