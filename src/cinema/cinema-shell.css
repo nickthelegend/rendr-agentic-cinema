@@ -847,3 +847,386 @@
 .cshell[data-tool="pan"] .react-flow__pane {
 	cursor: grab;
 }
+
+/* ── the film report ─────────────────────────────────────────── */
+
+.crep {
+	position: absolute;
+	inset: 0;
+	z-index: 8;
+	display: grid;
+	place-items: center;
+	padding: 40px 24px;
+	background: rgba(6, 6, 8, 0.72);
+	backdrop-filter: blur(6px);
+	animation: crep-in 160ms ease-out;
+}
+@keyframes crep-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.crep__panel {
+	display: flex;
+	flex-direction: column;
+	width: min(980px, 100%);
+	max-height: 100%;
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	background: #131316;
+	box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+	overflow: hidden;
+	animation: crep-rise 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes crep-rise {
+	from {
+		transform: translateY(10px) scale(0.99);
+	}
+	to {
+		transform: none;
+	}
+}
+.crep__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--line-soft);
+}
+.crep__tabs {
+	display: flex;
+	gap: 4px;
+}
+.crep__tabs button {
+	height: 30px;
+	padding: 0 13px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--ink-dim);
+	font: inherit;
+	cursor: pointer;
+}
+.crep__tabs button[data-on] {
+	background: rgba(255, 255, 255, 0.09);
+	color: var(--ink);
+}
+.crep__close {
+	height: 30px;
+	padding: 0 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--sunk);
+	color: var(--ink);
+	font: inherit;
+	cursor: pointer;
+}
+.crep__body {
+	overflow: auto;
+	padding: 16px 18px 22px;
+}
+.crep__lede {
+	margin: 0 0 16px;
+	font-size: 14px;
+	color: var(--ink);
+}
+.crep__none {
+	margin: 8px 0;
+	font-size: 12.5px;
+	color: var(--ink-dim);
+}
+.crep__sub {
+	margin: 20px 0 8px;
+	font-size: 11px;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+}
+
+.crep__who {
+	padding: 14px 0;
+	border-top: 1px solid var(--line-soft);
+}
+.crep__who header {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+.crep__who h4 {
+	margin: 0;
+	font-size: 14px;
+}
+.crep__who header span {
+	font-size: 11.5px;
+	color: var(--ink-dim);
+}
+.crep__row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+	flex-wrap: wrap;
+}
+.crep__tag {
+	flex: 0 0 auto;
+	width: 62px;
+	font-size: 9.5px;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+}
+.crep__row img {
+	height: 84px;
+	border-radius: 8px;
+	border: 1px solid var(--line);
+	background: #0d0d0f;
+}
+.crep__row--shots figure {
+	margin: 0;
+	display: grid;
+	gap: 4px;
+}
+.crep__row--shots figcaption {
+	font-size: 10px;
+	color: var(--ink-faint);
+	max-width: 130px;
+}
+
+.crep__stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+.crep__stats div {
+	flex: 1 1 120px;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 11px;
+	background: var(--sunk);
+}
+.crep__stats b {
+	display: block;
+	font-size: 22px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.crep__stats em {
+	font-style: normal;
+	font-size: 11px;
+	color: var(--ink-dim);
+}
+
+.crep__table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12.5px;
+}
+.crep__table th {
+	text-align: left;
+	font-weight: 500;
+	color: var(--ink-faint);
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line);
+}
+.crep__table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line-soft);
+}
+.crep__table td[data-bad] {
+	color: #e0556a;
+}
+
+.crep__mix {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 5px;
+}
+.crep__mix li {
+	display: flex;
+	justify-content: space-between;
+	padding: 7px 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--sunk);
+	font-size: 12.5px;
+}
+.crep__mix em {
+	font-style: normal;
+	color: #e0556a;
+}
+
+/* ── run theatre ─────────────────────────────────────────────── */
+
+/* Watching the agents work is the demo. A node that only changes colour when
+   it runs reads as a spreadsheet recalculating; these give the graph a pulse
+   while it is actually doing something, and stop the moment it is not. */
+
+@keyframes cin-pulse {
+	0%,
+	100% {
+		box-shadow:
+			0 0 0 0 rgba(224, 149, 43, 0.42),
+			0 10px 26px rgba(0, 0, 0, 0.4);
+	}
+	50% {
+		box-shadow:
+			0 0 0 7px rgba(224, 149, 43, 0),
+			0 10px 26px rgba(0, 0, 0, 0.4);
+	}
+}
+.cshell .cin-node[data-status="running"] {
+	animation: cin-pulse 1.5s ease-out infinite;
+	border-color: #e0952b;
+}
+
+/* A sweep across the card while it renders — the same idea as a skeleton, but
+   on the node that is actually busy rather than on everything at once. */
+@keyframes cin-sweep {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(200%);
+	}
+}
+.cshell .cin-node[data-status="running"]::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	overflow: hidden;
+	background: linear-gradient(
+		100deg,
+		transparent 35%,
+		rgba(224, 149, 43, 0.14) 50%,
+		transparent 65%
+	);
+	background-size: 220% 100%;
+	animation: cin-sweep 1.4s linear infinite;
+	mask-image: linear-gradient(#000, #000);
+}
+
+/* Edges leaving a running node carry the work forward visibly. */
+.cshell .react-flow__edge.animated .react-flow__edge-path {
+	stroke-dasharray: 5 5;
+	animation: cin-flow 620ms linear infinite;
+}
+@keyframes cin-flow {
+	to {
+		stroke-dashoffset: -10;
+	}
+}
+
+/* A finished node settles rather than snapping. */
+@keyframes cin-settle {
+	0% {
+		transform: scale(1.03);
+		border-color: #3fc79a;
+	}
+	100% {
+		transform: none;
+	}
+}
+.cshell .cin-node[data-status="ready"] {
+	animation: cin-settle 340ms ease-out;
+}
+
+/* A failure shakes once. Once — a node that keeps twitching is noise. */
+@keyframes cin-shake {
+	0%,
+	100% {
+		transform: none;
+	}
+	25% {
+		transform: translateX(-3px);
+	}
+	75% {
+		transform: translateX(3px);
+	}
+}
+.cshell .cin-node[data-status="failed"] {
+	animation: cin-shake 260ms ease-in-out;
+	border-color: #f2555a;
+}
+
+/* Cards arrive in sequence when a film opens, so a template reads as being
+   assembled rather than pasted. */
+@keyframes cin-arrive {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+.cshell .react-flow__node {
+	animation: cin-arrive 260ms ease-out backwards;
+}
+.cshell .react-flow__node:nth-child(1) {
+	animation-delay: 0ms;
+}
+.cshell .react-flow__node:nth-child(2) {
+	animation-delay: 24ms;
+}
+.cshell .react-flow__node:nth-child(3) {
+	animation-delay: 48ms;
+}
+.cshell .react-flow__node:nth-child(4) {
+	animation-delay: 72ms;
+}
+.cshell .react-flow__node:nth-child(5) {
+	animation-delay: 96ms;
+}
+.cshell .react-flow__node:nth-child(6) {
+	animation-delay: 120ms;
+}
+.cshell .react-flow__node:nth-child(7) {
+	animation-delay: 144ms;
+}
+.cshell .react-flow__node:nth-child(n + 8) {
+	animation-delay: 168ms;
+}
+
+/* The render control shows progress rather than only saying "Rendering…". */
+.cshell__render[data-progress]::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: rgba(255, 255, 255, 0.14);
+	transform-origin: left;
+	transform: scaleX(var(--progress, 0));
+	transition: transform 320ms ease-out;
+}
+.cshell__render {
+	position: relative;
+	overflow: hidden;
+}
+.cshell__render > * {
+	position: relative;
+}
+
+/* Every animation above is decoration on top of a state change that already
+   happened. Anyone who has asked not to see motion loses nothing by it. */
+@media (prefers-reduced-motion: reduce) {
+	.cshell .cin-node,
+	.cshell .cin-node::after,
+	.cshell .react-flow__node,
+	.cshell .react-flow__edge.animated .react-flow__edge-path,
+	.crep,
+	.crep__panel {
+		animation: none !important;
+	}
+	.cshell__render[data-progress]::before {
+		transition: none;
+	}
+}

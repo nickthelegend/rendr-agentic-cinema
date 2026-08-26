@@ -122,6 +122,27 @@ export interface Ledger {
 	 * a different picture.
 	 */
 	judge(graphId: string, nodeId: string, at: string, accepted: boolean): Promise<void>;
+	/**
+	 * The shape of a film's spend and reliability, in one round trip.
+	 *
+	 * Four questions a producer actually asks — how much, how fast, how often it
+	 * fails and why — answered by aggregates rather than by pulling every row
+	 * into the page and counting in JavaScript. That is the difference between
+	 * using a column store and using it as a bucket.
+	 */
+	insights(graphId: string): Promise<LedgerInsights>;
+}
+
+export interface LedgerInsights {
+	calls: number;
+	failures: number;
+	/** Median and worst-case latency, in milliseconds. */
+	medianMs: number;
+	p95Ms: number;
+	/** Kept over judged. Absent when nothing has been judged yet. */
+	keptRate?: number;
+	byKind: Array<{ kind: string; calls: number; failures: number; medianMs: number }>;
+	failureMix: Array<{ kind: string; count: number }>;
 }
 
 /**
@@ -296,6 +317,65 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 					`WHERE graph_id = '${escape(graphId)}' AND node_id = '${escape(nodeId)}' ` +
 					`AND at = '${escape(at)}'`,
 			);
+		},
+
+		async insights(graphId) {
+			const scope = `WHERE graph_id = '${escape(graphId)}'`;
+			// One statement, three result sets, using quantile and countIf rather
+			// than shipping rows to the browser to be counted there.
+			const [totals, kinds, failures] = await Promise.all([
+				run(
+					`SELECT count() AS calls, countIf(ok = 0) AS failures, ` +
+						`quantileExact(0.5)(elapsed_ms) AS median, quantileExact(0.95)(elapsed_ms) AS p95, ` +
+						`countIf(accepted = 1) AS kept, countIf(accepted IS NOT NULL) AS judged ` +
+						`FROM ${TABLE} ${scope}`,
+					"JSONEachRow",
+				),
+				run(
+					`SELECT node_kind AS kind, count() AS calls, countIf(ok = 0) AS failures, ` +
+						`quantileExact(0.5)(elapsed_ms) AS median FROM ${TABLE} ${scope} ` +
+						`GROUP BY node_kind ORDER BY calls DESC`,
+					"JSONEachRow",
+				),
+				run(
+					`SELECT if(error_kind = '', 'unclassified', error_kind) AS kind, count() AS count ` +
+						`FROM ${TABLE} ${scope} AND ok = 0 GROUP BY kind ORDER BY count DESC`,
+					"JSONEachRow",
+				),
+			]);
+
+			const first = (text: string): Record<string, unknown> => {
+				const line = text.split("\n").find((entry) => entry.trim());
+				return line ? (JSON.parse(line) as Record<string, unknown>) : {};
+			};
+			const many = (text: string): Array<Record<string, unknown>> =>
+				text
+					.split("\n")
+					.filter((line) => line.trim())
+					.map((line) => JSON.parse(line) as Record<string, unknown>);
+
+			const head = first(totals);
+			const judged = Number(head.judged ?? 0);
+			return {
+				calls: Number(head.calls ?? 0),
+				failures: Number(head.failures ?? 0),
+				medianMs: Math.round(Number(head.median ?? 0)),
+				p95Ms: Math.round(Number(head.p95 ?? 0)),
+				// Undefined rather than zero: "nothing judged yet" and "nothing kept"
+				// are different facts, and folding them together would show a fresh
+				// film as a total failure.
+				keptRate: judged > 0 ? Number(head.kept ?? 0) / judged : undefined,
+				byKind: many(kinds).map((row) => ({
+					kind: String(row.kind ?? ""),
+					calls: Number(row.calls ?? 0),
+					failures: Number(row.failures ?? 0),
+					medianMs: Math.round(Number(row.median ?? 0)),
+				})),
+				failureMix: many(failures).map((row) => ({
+					kind: String(row.kind ?? ""),
+					count: Number(row.count ?? 0),
+				})),
+			};
 		},
 
 		async spentOn(graphId) {

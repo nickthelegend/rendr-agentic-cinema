@@ -13,6 +13,7 @@ import type { EditorApi } from "../palmier-ui/state";
 import { AUTO_DEBOUNCE_MS, confirmMessage, DEFAULT_CALL_CEILING, decideAuto } from "./auto";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
+import { CinemaReport } from "./CinemaReport";
 import { CinemaShell } from "./CinemaShell";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
 import { readyScenes } from "./commit";
@@ -23,7 +24,7 @@ import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, needsRun, runGraph } from "./run";
 import { moveFor } from "./scene";
-import { castVoices, estimateCost, VOICES } from "./sound";
+import { estimateCost } from "./sound";
 import { reviewCut } from "./structure";
 import { createStubProvider } from "./stubProvider";
 
@@ -58,6 +59,9 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	const [showGrid, setShowGrid] = useState(true);
 	const [showNotes, setShowNotes] = useState(true);
 	const [tool, setTool] = useState<"select" | "pan">("select");
+	const [report, setReport] = useState<null | "cast" | "ledger">(null);
+	// How much of the current run is done, for the fill on the render control.
+	const [progress, setProgress] = useState(0);
 	// Flips once the ledger is connected, so the inspector re-renders with it.
 	const [ledgerReady, setLedgerReady] = useState(false);
 	// Incremented once a run's ledger writes have landed, so the inspector
@@ -390,9 +394,21 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 					// Commit exactly what the runner has, not a patch onto the
 					// graph this closure captured — that one is from before the
 					// run and using it throws away every output so far.
-					onProgress: (_nodeId, _status, live) =>
-						// Status ticks are not edits, so they stay out of undo.
-						api.updateCinemaGraph(live, { undoable: false }),
+					onProgress: (_nodeId, status, live) => {
+						// Counted off the graph the runner hands back rather than a
+						// local tally, so a skipped node moves the bar too.
+						if (status === "ready" || status === "failed") {
+							const done = live.nodes.filter(
+								(entry) => entry.status === "ready" || entry.status === "failed",
+							).length;
+							setProgress(Math.min(1, done / Math.max(1, live.nodes.length)));
+						}
+						// Status ticks are not edits, so they stay out of undo. This
+						// line is what makes the canvas move during a run at all —
+						// an early return above it once silently froze every node at
+						// idle until the run finished.
+						api.updateCinemaGraph(live, { undoable: false });
+					},
 					onRecord: (entry) => {
 						// Fire and forget, and swallow the failure: bookkeeping must
 						// never take a render down with it. The ledger holds what it
@@ -433,6 +449,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				);
 			} finally {
 				setRunning(false);
+				setProgress(0);
 				// The budget in the shell is only meaningful if it moves. Read it
 				// back after the run rather than counting locally, so a manual
 				// render and an automatic one agree.
@@ -560,6 +577,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				running={running}
 				pending={pending}
 				costUsd={cost.usd}
+				progress={progress}
 				onRender={() => run()}
 				callsLeft={Math.max(0, DEFAULT_CALL_CEILING - spent)}
 				auto={graph.auto}
@@ -611,21 +629,13 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 					api.selectCinemaNode(first.id);
 					notice(`${graph.nodes.length} node(s) on this canvas.`);
 				}}
-				onCast={() => {
-					// castVoices had no UI at all until this button needed one.
-					const cast = castVoices(graph);
-					notice(
-						cast.length
-							? cast.map((who) => `${who.name}: ${VOICES[who.voice]}`).join(" · ")
-							: "No characters in this film yet.",
-					);
-				}}
+				onCast={() => setReport("cast")}
 				onAddNode={() => api.updateCinemaGraph(addNode(graph, "beat"))}
 				onAgent={() => api.patch({ agentPanelVisible: !state.agentPanelVisible })}
 				onShortcuts={() =>
 					notice("⌘Z undoes the graph. Double-click the canvas to add a node.")
 				}
-				onHistory={() => notice(`${spent} model call(s) recorded for this film.`)}
+				onHistory={() => setReport("ledger")}
 				language="EN"
 				onLanguage={() => notice("This build ships English only.")}
 				aside={
@@ -699,6 +709,13 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 							</p>
 						))}
 					</div>
+				) : null}
+				{report ? (
+					<CinemaReport
+						graph={graph}
+						ledger={ledgerReady ? ledger.current : null}
+						onClose={() => setReport(null)}
+					/>
 				) : null}
 			</CinemaShell>
 		</>

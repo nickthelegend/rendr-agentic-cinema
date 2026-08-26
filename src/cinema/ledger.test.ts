@@ -299,3 +299,71 @@ describe("where statements are sent", () => {
 		expect(headers.Authorization).toMatch(/^Basic /);
 	});
 });
+
+describe("insights", () => {
+	const three = (totals: string, kinds = "", failures = "") => {
+		const sent: string[] = [];
+		global.fetch = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+			const body = init?.body ?? "";
+			sent.push(body);
+			const text = /GROUP BY node_kind/.test(body)
+				? kinds
+				: /ok = 0 GROUP BY kind/.test(body)
+					? failures
+					: totals;
+			return { ok: true, status: 200, text: async () => text } as Response;
+		}) as never;
+		return {
+			ledger: createClickhouseLedger({ url: "http://ch", user: "u", password: "p" }),
+			sent,
+		};
+	};
+
+	it("asks the database to aggregate rather than pulling rows", () => {
+		// The difference between using a column store and using it as a bucket.
+		const { ledger, sent } = three(JSON.stringify({ calls: 0 }));
+		return ledger.insights("g1").then(() => {
+			const all = sent.join(" ");
+			expect(all).toContain("quantileExact(0.5)");
+			expect(all).toContain("countIf(ok = 0)");
+			expect(all).not.toContain("SELECT * FROM");
+		});
+	});
+
+	it("reads totals, latency and the per-kind split", async () => {
+		const { ledger } = three(
+			JSON.stringify({ calls: 8, failures: 1, median: 260, p95: 1100, kept: 3, judged: 4 }),
+			[
+				JSON.stringify({ kind: "scene", calls: 5, failures: 1, median: 300 }),
+				JSON.stringify({ kind: "character", calls: 1, failures: 0, median: 5000 }),
+			].join("\n"),
+			JSON.stringify({ kind: "safety", count: 1 }),
+		);
+		const out = await ledger.insights("g1");
+		expect(out).toMatchObject({ calls: 8, failures: 1, medianMs: 260, p95Ms: 1100 });
+		expect(out.keptRate).toBeCloseTo(0.75);
+		expect(out.byKind[0]).toEqual({ kind: "scene", calls: 5, failures: 1, medianMs: 300 });
+		expect(out.failureMix).toEqual([{ kind: "safety", count: 1 }]);
+	});
+
+	it("leaves the kept rate undefined when nothing has been judged", async () => {
+		// "Nothing judged yet" and "nothing kept" are different facts; folding
+		// them together shows a fresh film as a total failure.
+		const { ledger } = three(JSON.stringify({ calls: 5, kept: 0, judged: 0 }));
+		expect((await ledger.insights("g1")).keptRate).toBeUndefined();
+	});
+
+	it("survives an empty table", async () => {
+		const { ledger } = three("");
+		expect(await ledger.insights("g1")).toMatchObject({ calls: 0, failures: 0, byKind: [] });
+	});
+
+	it("names an unclassified failure rather than dropping it", async () => {
+		const { ledger } = three(
+			JSON.stringify({ calls: 1 }),
+			"",
+			JSON.stringify({ kind: "unclassified", count: 1 }),
+		);
+		expect((await ledger.insights("g1")).failureMix[0].kind).toBe("unclassified");
+	});
+});

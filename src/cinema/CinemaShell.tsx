@@ -9,6 +9,7 @@
 // buttons that do nothing is the most expensive kind of polish — it looks
 // finished and teaches the user that controls here are decorative.
 
+import type React from "react";
 import type { ReactNode } from "react";
 
 import {
@@ -113,6 +114,8 @@ export interface CinemaShellProps {
 	onToggleNotes: () => void;
 	/** Names the cast and the voice each will be read in. */
 	onCast: () => void;
+	/** How far through a run we are, 0–1. Drives the fill on the render button. */
+	progress?: number;
 	onAddNode: () => void;
 	onAgent: () => void;
 	onShortcuts: () => void;
@@ -491,6 +494,11 @@ export function CinemaShell(props: CinemaShellProps) {
 				<button
 					type="button"
 					className="cshell__render"
+					// A bar that fills across the control, rather than a word that
+					// changes. The graph is doing eight things; the button should
+					// say how far through it is.
+					data-progress={running || undefined}
+					style={{ "--progress": props.progress ?? 0 } as React.CSSProperties}
 					disabled={running || pending === 0}
 					onClick={onRender}
 				>
