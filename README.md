@@ -1,20 +1,117 @@
 <div align="center">
 
-<img src="public/branding/rendr-logo.svg" alt="Rendr" width="360" />
+<img src="public/branding/rendr-logo.svg" alt="Rendr Agentic Cinema" width="360" />
 
-**Record and edit in one app — driven by humans and agents alike.**
+**A node graph that casts, writes and shoots a film — and hands you a timeline, not a file.**
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-2563eb?style=for-the-badge)](LICENSE.md)
-[![MCP](https://img.shields.io/badge/MCP-50%20tools-7c3aed?style=for-the-badge)](#the-mcp-server)
+[![MCP](https://img.shields.io/badge/MCP-102%20tools-7c3aed?style=for-the-badge)](#the-mcp-server)
+[![Live](https://img.shields.io/badge/demo-hosted-3fc79a?style=for-the-badge)](https://web-production-d3da.up.railway.app)
+
+**[Open the live demo →](https://web-production-d3da.up.railway.app)**
 
 </div>
 
-Rendr is an open-source Electron app that captures screen video and edits it in the
-same place. Every capability is exposed twice: once as a UI a person uses, and once
-as an [MCP](https://modelcontextprotocol.io) tool an agent calls. Neither is a
-wrapper around the other — a recording an agent starts runs through exactly the
-same pipeline as one a person starts, and the preview and the exported file are
-rendered by the same functions.
+Rendr Agentic Cinema is a submission for [Agentic Cinema](https://agentic-cinema.devpost.com/).
+You assemble a cast, a world and a story as a graph of nodes; a network of agents
+turns that into ordered shots and renders them; and the result lands on a real
+editable timeline rather than arriving as a video file you either accept or
+regenerate.
+
+## The argument
+
+**The hard problem is consistency, not generation.** Making one picture of a
+character is a single API call. Making *eleven pictures of the same character* is
+the thing nobody has solved well, and it is what separates a demo from a tool. So
+a Character node is not a prompt — it is an identity that gets locked once: a
+reference, a sheet of angles, a seed, a canonical description. Every scene that
+names that character passes the sheet as image context, and the app can show you
+the same face across every shot it appears in.
+
+**What comes out is a project, not a file.** Every other tool in this space hands
+you a clip; when the third shot is wrong you regenerate and hope. Here the shots
+land as clips on a timeline that already has 102 MCP tools over it — trim,
+reorder, grade, caption, narrate, export. A shot that came out nearly right is
+four seconds of trimming rather than a prompt rewritten ten times. It also means
+the generative half never has to be perfect.
+
+## What it does
+
+| | |
+|---|---|
+| **Cast** | Lock a character from a description or a reference photo. The sheet — front, three-quarter, profile, back — is what every later shot refers back to. |
+| **Write** | A story decomposes into ordered scene specs with a structured contract: who is in frame, where, what time, what camera, what happens. Continuity is checked across the set afterwards, not hoped for during. |
+| **Shoot** | Each scene renders with a shot vocabulary — ten framings, seven lenses, ten lighting setups, seven stocks, a film-wide palette — inferred from the shot's own prose and overridable per node. |
+| **Cut** | Scenes become clips on the timeline with a camera move over each, in the order the story asked for. |
+| **Account** | Every model call becomes a row in Clickhouse: what was asked, which model, how long, whether a human kept it. |
+
+## Clickhouse, and what it is actually for
+
+The brief requires a partner integration with real runtime use. Clickhouse here is
+the generation ledger, and it earns its place by making two things possible that
+are otherwise hand-waving:
+
+- **What did we already try.** Re-rendering a shot shows the takes you rejected,
+  so nobody pays twice for the same mistake.
+- **Which prompts actually work.** Kept takes are ranked by phrasing, so the
+  leaderboard is a query rather than a feeling.
+
+The insight panel asks the database to do the work — `quantileExact` for median
+and p95 latency, `countIf` for failures and kept-rate, grouped by node kind and by
+error kind. That is the difference between using a column store and using it as a
+bucket.
+
+In the hosted build the browser never talks to Clickhouse directly. It posts to a
+same-origin path and a small server forwards an allow-list of statement shapes,
+because pointing a page straight at a database means shipping the password in the
+JavaScript bundle.
+
+## Running it
+
+```bash
+npm install
+npm run dev:ui          # the editor in a browser, no Electron
+npm test                # 2072 tests
+npm run build:web       # the hosted payload
+```
+
+The graph runs against a local stub when no model key is present. **The stub paints
+"STUB · no model was called" into every frame it produces**, so a placeholder can
+never be mistaken for a render in a screenshot or a demo. To use the real model,
+put a key from [aistudio.google.com](https://aistudio.google.com) in `.env.local`:
+
+```
+VITE_GEMINI_API_KEY=...
+```
+
+That is a different product from a Gemini app subscription, which carries no API
+quota. `Test connection` in the app runs five real checks against the API,
+including measuring the returned PNG's dimensions rather than trusting the
+requested aspect ratio.
+
+To keep a ledger, point it at a Clickhouse:
+
+```
+VITE_CLICKHOUSE_URL=http://127.0.0.1:8123
+VITE_CLICKHOUSE_USER=cinema
+VITE_CLICKHOUSE_PASSWORD=...
+```
+
+Without one the app runs identically, minus the history — bookkeeping never blocks
+a render.
+
+## Where the desktop app fits
+
+This began as [Rendr](#where-it-comes-from), a screen recorder and editor, and most
+of that is still here. Recording is **gated rather than deleted**: one capability
+flag turns off the capture panels, the record button and the recording MCP tools,
+so the cinema build has no camera in it while the code stays compiled, tested and
+able to take upstream fixes. The timeline, the export pipeline and the MCP surface
+underneath are the recorder's, which is why a generated film arrives somewhere you
+can actually work.
+
+The MCP server is a desktop bridge and is not reachable from a browser tab; the
+hosted build says so plainly rather than pretending otherwise.
 
 ---
 

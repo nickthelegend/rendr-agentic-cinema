@@ -17,9 +17,14 @@ Non-negotiables, from the rules:
 - **A public repo under an open-source licence.** Already satisfied: this is
   AGPL-3.0, inherited from Recordly, with GPL-3.0 material from Palmier Pro.
   See NOTICE.md — that attribution has to survive whatever this becomes.
-- **A hosted project URL.** This is currently an Electron desktop app, which is
-  the one requirement the codebase does not meet as it stands.
+- **A hosted project URL.** Met: <https://web-production-d3da.up.railway.app>,
+  two Railway services — the site, and a Clickhouse it reaches over the private
+  network through a proxy that holds the credential.
 - **A three-minute trailer on YouTube or Vimeo**, public, English or subtitled.
+  The film is made — `node scripts/record-trailer.mjs` records the deployed app
+  in a real browser, narrates it with speech generated locally, and burns the
+  subtitles in. **Uploading it needs an account only you can sign into**, so
+  that last step is yours.
 
 Judged on technological implementation, design, potential impact, and quality
 of the idea.

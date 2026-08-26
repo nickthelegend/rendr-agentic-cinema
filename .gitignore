@@ -66,3 +66,8 @@ preflight-out/
 # itself was healthy. This is the second time an ignore rule has silently
 # emptied a deploy; the payload stays visible now, and `npm run build:web`
 # rewrites it.
+
+# Trailer working directory. Regenerate with `node scripts/record-trailer.mjs`;
+# the finished film belongs on YouTube, not in git history.
+.trailer/
+.trailer-run.log
