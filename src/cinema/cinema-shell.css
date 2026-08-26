@@ -1488,3 +1488,60 @@
 	color: var(--cin-text-2, #9ca3af);
 	max-width: 62ch;
 }
+
+/* ── Drift ───────────────────────────────────────────────────────────────────
+ * A bar per shot, tall when the shot sits near the middle of its own cut. The
+ * outlier is red because the whole point of the strip is to be scannable — a
+ * viewer should be able to find the shot that wandered without reading a
+ * number, then hover to get the number.
+ */
+.crep__drift {
+	display: flex;
+	align-items: flex-end;
+	gap: 4px;
+	height: 92px;
+	margin: 10px 0 4px;
+	padding: 0 2px;
+}
+
+.crep__driftbar {
+	flex: 1 1 0;
+	min-width: 10px;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: stretch;
+	gap: 4px;
+}
+
+.crep__driftbar span {
+	display: block;
+	background: linear-gradient(180deg, #6ea8fe, #3f6fd8);
+	border-radius: 3px 3px 0 0;
+	min-height: 2px;
+	transition: height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.crep__driftbar[data-outlier] span {
+	background: linear-gradient(180deg, #f0616d, #b83944);
+}
+
+.crep__driftbar em {
+	font-style: normal;
+	font-size: 9px;
+	text-align: center;
+	color: var(--cin-text-3, #6b7280);
+}
+
+.crep__driftbar[data-outlier] em {
+	color: #ffb4ba;
+}
+
+/* The bars grow on open. Without this the strip appears fully formed and reads
+   as a static image rather than a measurement that was just taken. */
+@media (prefers-reduced-motion: reduce) {
+	.crep__driftbar span {
+		transition: none;
+	}
+}

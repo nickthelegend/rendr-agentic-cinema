@@ -11,9 +11,11 @@
 // Deliberately read-only. Nothing here edits a graph, so it can be opened
 // mid-run without any risk of fighting the runner for state.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { readyScenes } from "./commit";
 import { type CastConsistency, castConsistency, consistencySummary } from "./consistency";
+import { type Drift, driftAcross, hashFrame } from "./drift";
 import { shotSizeHistogram, storyboardHtml } from "./explain";
 import type { Ledger, LedgerInsights } from "./ledger";
 import type { CinemaGraph } from "./nodes";
@@ -128,6 +130,15 @@ export function CinemaReport({
 
 	const cast = castConsistency(graph);
 	const manifest = manifestOf(graph);
+	// Memoised because DriftStrip's effect keys on this array, and a new array
+	// every render would re-decode every frame forever.
+	const orderedFrames = useMemo(
+		() =>
+			readyScenes(graph)
+				.sort((a, b) => a.spec.index - b.spec.index)
+				.map((entry) => entry.image),
+		[graph],
+	);
 	const shots = graph.nodes.find((node) => node.kind === "story")?.output?.scenes ?? [];
 	const histogram = shotSizeHistogram(shots);
 	const widest = Math.max(1, ...histogram.map((entry) => entry.count));
@@ -249,6 +260,7 @@ export function CinemaReport({
 						) : (
 							cast.map((who) => <Sheet key={who.id} who={who} />)
 						)}
+						<DriftStrip frames={orderedFrames} />
 					</div>
 				) : null}
 
@@ -344,6 +356,75 @@ export function CinemaReport({
 				{tab === "chain" ? <Provenance graph={graph} manifest={manifest} /> : null}
 			</div>
 		</div>
+	);
+}
+
+/**
+ * How far each shot sits from the middle of its own cut.
+ *
+ * Deliberately labelled drift rather than likeness. A difference hash measures
+ * composition, palette and contrast — not who is in frame — so calling it a
+ * likeness score would be a claim the first person with any computer-vision
+ * background would puncture. Drift is the question this can honestly answer,
+ * and it happens to be one a colourist actually asks.
+ */
+function DriftStrip({ frames }: { frames: Array<{ base64: string; mimeType: string }> }) {
+	const [drift, setDrift] = useState<Drift[] | null>(null);
+	const [failed, setFailed] = useState(false);
+
+	useEffect(() => {
+		if (frames.length === 0) return;
+		let live = true;
+		Promise.all(frames.map((frame) => hashFrame(frame.base64, frame.mimeType)))
+			.then((hashes) => {
+				if (live) setDrift(driftAcross(hashes));
+			})
+			// Decoding can fail on a browser without OffscreenCanvas. Saying so
+			// beats an empty strip that reads as "no drift".
+			.catch(() => {
+				if (live) setFailed(true);
+			});
+		return () => {
+			live = false;
+		};
+	}, [frames]);
+
+	if (frames.length < 2) return null;
+	if (failed) {
+		return <p className="crep__none">Drift could not be measured in this browser.</p>;
+	}
+	if (!drift) return <p className="crep__none">Measuring drift…</p>;
+
+	const wandered = drift.filter((shot) => shot.outlier);
+	return (
+		<>
+			<h4 className="crep__sub">Drift across the cut</h4>
+			<p className="crep__note">
+				How far each shot sits from the middle of this film, by difference hash — 64 bits of
+				composition, palette and contrast. Not a likeness score: it does not know who is in
+				frame.{" "}
+				{wandered.length === 0
+					? "Nothing has wandered."
+					: `Shot${wandered.length === 1 ? "" : "s"} ${wandered
+							.map((shot) => shot.index + 1)
+							.join(
+								", ",
+							)} sit${wandered.length === 1 ? "s" : ""} well outside the rest.`}
+			</p>
+			<div className="crep__drift">
+				{drift.map((shot) => (
+					<div
+						key={shot.index}
+						className="crep__driftbar"
+						data-outlier={shot.outlier || undefined}
+						title={`Shot ${shot.index + 1}: ${shot.bits} of 64 bits from the middle`}
+					>
+						<span style={{ height: `${Math.round(shot.closeness * 100)}%` }} />
+						<em>{shot.index + 1}</em>
+					</div>
+				))}
+			</div>
+		</>
 	);
 }
 
