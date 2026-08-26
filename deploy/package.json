@@ -2,6 +2,14 @@
   "name": "rendr-agentic-cinema-web",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node server.mjs" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "@stellar/stellar-sdk": "^17.0.1"
+  }
 }

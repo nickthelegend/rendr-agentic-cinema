@@ -61,7 +61,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	const [showGrid, setShowGrid] = useState(true);
 	const [showNotes, setShowNotes] = useState(true);
 	const [tool, setTool] = useState<"select" | "pan">("select");
-	const [report, setReport] = useState<null | "cast" | "ledger">(null);
+	const [report, setReport] = useState<null | "cast" | "ledger" | "chain">(null);
 	// How much of the current run is done, for the fill on the render control.
 	const [progress, setProgress] = useState(0);
 	const [palette, setPalette] = useState(false);
@@ -661,6 +661,13 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 					"application/json",
 					exportFilm(graph),
 				),
+		},
+		{
+			id: "chain",
+			name: "Provenance",
+			group: "Report",
+			keywords: "chain notarise verify stellar blockchain proof",
+			run: () => setReport("chain"),
 		},
 		{
 			id: "auto",

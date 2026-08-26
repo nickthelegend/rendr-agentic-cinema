@@ -1,10 +1,12 @@
-// The two things worth showing a judge, behind one overlay.
+// The three things worth showing a judge, behind one overlay.
 //
 // Consistency is the project's technical claim — the same face across every
 // shot — and until this panel existed it was only ever true, never visible.
 // The ledger tab is the partner integration doing something a log file cannot:
 // aggregates computed in the database and read back as the shape of a film's
-// spend.
+// spend. Provenance is the answer to the question generative video cannot dodge
+// — which frames came out of a model, from what prompt — written somewhere the
+// person asking does not have to trust us about.
 //
 // Deliberately read-only. Nothing here edits a graph, so it can be opened
 // mid-run without any risk of fighting the runner for state.
@@ -15,6 +17,15 @@ import { type CastConsistency, castConsistency, consistencySummary } from "./con
 import { shotSizeHistogram, storyboardHtml } from "./explain";
 import type { Ledger, LedgerInsights } from "./ledger";
 import type { CinemaGraph } from "./nodes";
+import {
+	digestOf,
+	type Manifest,
+	manifestOf,
+	notarise,
+	type Receipt,
+	type Verification,
+	verify,
+} from "./provenance";
 
 export interface CinemaReportProps {
 	graph: CinemaGraph;
@@ -26,7 +37,7 @@ export interface CinemaReportProps {
 	 * wrong page is worse than one that does nothing, because it looks like it
 	 * worked.
 	 */
-	initialTab?: "cast" | "ledger";
+	initialTab?: "cast" | "ledger" | "chain";
 	/** Hands the storyboard to the browser. */
 	onDownload: (name: string, type: string, body: string) => void;
 	ledger?: Ledger | null;
@@ -93,7 +104,7 @@ export function CinemaReport({
 	onDownload,
 	onClose,
 }: CinemaReportProps) {
-	const [tab, setTab] = useState<"cast" | "ledger">(initialTab);
+	const [tab, setTab] = useState<"cast" | "ledger" | "chain">(initialTab);
 	const [insights, setInsights] = useState<LedgerInsights | null>(null);
 	const [failed, setFailed] = useState(false);
 
@@ -116,6 +127,7 @@ export function CinemaReport({
 	}, [ledger, graph.id, tab]);
 
 	const cast = castConsistency(graph);
+	const manifest = manifestOf(graph);
 	const shots = graph.nodes.find((node) => node.kind === "story")?.output?.scenes ?? [];
 	const histogram = shotSizeHistogram(shots);
 	const widest = Math.max(1, ...histogram.map((entry) => entry.count));
@@ -169,6 +181,15 @@ export function CinemaReport({
 							onClick={() => setTab("ledger")}
 						>
 							Ledger
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={tab === "chain"}
+							data-on={tab === "chain" || undefined}
+							onClick={() => setTab("chain")}
+						>
+							Provenance
 						</button>
 					</div>
 					<button
@@ -313,7 +334,161 @@ export function CinemaReport({
 						)}
 					</div>
 				)}
+
+				{tab === "chain" ? <Provenance graph={graph} manifest={manifest} /> : null}
 			</div>
+		</div>
+	);
+}
+
+/**
+ * What was generated, signed onto a public chain.
+ *
+ * The receipt is deliberately not enough on its own — it is something we
+ * printed. The verify button is the part that matters: it fetches the
+ * transaction back from the network, recomputes this film's digest locally, and
+ * compares. A green line here means someone who does not trust this app can run
+ * the same check from the explorer link.
+ */
+function Provenance({ graph, manifest }: { graph: CinemaGraph; manifest: Manifest }) {
+	const [receipt, setReceipt] = useState<Receipt | null>(null);
+	const [checked, setChecked] = useState<Verification | null>(null);
+	const [busy, setBusy] = useState<"sign" | "verify" | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [digest, setDigest] = useState("");
+
+	// The digest of the film as it stands, shown before anything is signed so
+	// the number on screen is the one that will go on chain.
+	useEffect(() => {
+		let live = true;
+		digestOf(manifest).then((value) => {
+			if (live) setDigest(value);
+		});
+		return () => {
+			live = false;
+		};
+	}, [manifest]);
+
+	const sign = async () => {
+		setBusy("sign");
+		setError(null);
+		try {
+			const signed = await notarise(graph);
+			setReceipt(signed);
+			setChecked(null);
+		} catch (problem) {
+			setError(String(problem instanceof Error ? problem.message : problem));
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const check = async (hash: string) => {
+		setBusy("verify");
+		setError(null);
+		try {
+			setChecked(await verify(graph, hash));
+		} catch (problem) {
+			setError(String(problem instanceof Error ? problem.message : problem));
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	return (
+		<div className="crep__body">
+			<p className="crep__lede">
+				{manifest.shots === 0
+					? "Nothing has rendered yet, so there is nothing to notarise."
+					: `${manifest.shots} rendered shot${manifest.shots === 1 ? "" : "s"} from ` +
+						`${manifest.model}${manifest.seed === null ? "" : `, seed ${manifest.seed}`}.`}
+			</p>
+
+			<dl className="crep__kv">
+				<div>
+					<dt>Digest</dt>
+					<dd className="crep__mono">{digest || "…"}</dd>
+				</div>
+				<div>
+					<dt>Network</dt>
+					<dd>Stellar testnet — test funds, no value</dd>
+				</div>
+			</dl>
+
+			<div className="crep__acts">
+				<button
+					type="button"
+					className="crep__close"
+					disabled={manifest.shots === 0 || busy !== null}
+					onClick={() => void sign()}
+				>
+					{busy === "sign" ? "Signing…" : "Notarise this cut"}
+				</button>
+				{receipt ? (
+					<button
+						type="button"
+						className="crep__close"
+						disabled={busy !== null}
+						onClick={() => void check(receipt.hash)}
+					>
+						{busy === "verify" ? "Reading the chain…" : "Verify from chain"}
+					</button>
+				) : null}
+			</div>
+
+			{error ? <p className="crep__bad">{error}</p> : null}
+
+			{receipt ? (
+				<dl className="crep__kv">
+					<div>
+						<dt>Transaction</dt>
+						<dd className="crep__mono">{receipt.hash}</dd>
+					</div>
+					<div>
+						<dt>Ledger</dt>
+						<dd>{receipt.ledger}</dd>
+					</div>
+					<div>
+						<dt>Signed by</dt>
+						<dd className="crep__mono">{receipt.account}</dd>
+					</div>
+					<div>
+						<dt>Explorer</dt>
+						<dd>
+							<a href={receipt.explorer} target="_blank" rel="noreferrer noopener">
+								{receipt.explorer.replace(/^https:\/\//, "")}
+							</a>
+						</dd>
+					</div>
+				</dl>
+			) : null}
+
+			{checked ? (
+				<p className={checked.matches ? "crep__good" : "crep__bad"}>
+					{checked.matches
+						? `The chain holds this exact cut. Read back from ledger ` +
+							`${checked.record.ledger}${checked.record.at ? ` at ${checked.record.at}` : ""}.`
+						: `The cut has changed since it was notarised — the chain holds ` +
+							`${checked.record.digest.slice(0, 12)}…, this film hashes to ` +
+							`${checked.expected.slice(0, 12)}…. Notarise again.`}
+				</p>
+			) : null}
+
+			<h4 className="crep__sub">What goes on chain</h4>
+			<p className="crep__note">
+				The digest above, and three readable fields: the film's name, its shot count and the
+				model. Not the frames — those are megabytes. Their fingerprints are inside the
+				manifest the digest covers, so a frame can still be proved to be one of the ones
+				that was signed.
+			</p>
+			<ul className="crep__mix">
+				{manifest.prompts.slice(0, 8).map((prompt, index) => (
+					<li key={`${prompt}-${index}`}>
+						<span>{prompt}</span>
+						<em className="crep__mono">{manifest.frames[index]?.slice(0, 8) ?? ""}</em>
+					</li>
+				))}
+			</ul>
 		</div>
 	);
 }

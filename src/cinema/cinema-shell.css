@@ -1408,3 +1408,83 @@
 	font-variant-numeric: tabular-nums;
 	color: var(--ink);
 }
+
+/* ── Provenance ──────────────────────────────────────────────────────────────
+ * A record somebody else can check is worth more than a claim, so this tab is
+ * built to be *read* rather than admired: hashes in a mono face at a size you
+ * can actually compare character by character, and the verdict as one plain
+ * sentence in green or red rather than an icon that needs a legend.
+ */
+.crep__kv {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 6px 16px;
+	margin: 14px 0;
+	font-size: 12px;
+}
+
+.crep__kv > div {
+	display: contents;
+}
+
+.crep__kv dt {
+	color: var(--cin-text-3, #6b7280);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: 10px;
+	padding-top: 2px;
+}
+
+.crep__kv dd {
+	margin: 0;
+	color: var(--cin-text-1, #e5e7eb);
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.crep__kv a {
+	color: var(--cin-accent, #6ea8fe);
+}
+
+/* Hashes are compared by eye. A proportional face makes that genuinely hard. */
+.crep__mono {
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+	font-size: 11px;
+	letter-spacing: 0.01em;
+}
+
+.crep__acts {
+	display: flex;
+	gap: 8px;
+	margin: 16px 0 4px;
+	flex-wrap: wrap;
+}
+
+.crep__good,
+.crep__bad {
+	margin: 12px 0 0;
+	padding: 10px 12px;
+	border-radius: 8px;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.crep__good {
+	background: color-mix(in srgb, #3fc79a 14%, transparent);
+	border: 1px solid color-mix(in srgb, #3fc79a 34%, transparent);
+	color: #9ff0d0;
+}
+
+.crep__bad {
+	background: color-mix(in srgb, #f0616d 14%, transparent);
+	border: 1px solid color-mix(in srgb, #f0616d 34%, transparent);
+	color: #ffb4ba;
+}
+
+.crep__note {
+	margin: 6px 0 12px;
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--cin-text-2, #9ca3af);
+	max-width: 62ch;
+}

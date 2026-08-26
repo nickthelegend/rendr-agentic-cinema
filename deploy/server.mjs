@@ -14,6 +14,8 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { notarise, readBack } from "./notary.mjs";
+
 // `public`, not `dist`: the repo gitignores dist, and Railway honours the
 // ignore file when it builds the upload — so the whole site was silently left
 // out and every request fell through to a missing index.html.
@@ -54,6 +56,15 @@ function allowed(sql) {
 	if (/^SELECT [\s\S]+ FROM generations\b/i.test(text)) return true;
 	if (/^ALTER TABLE generations UPDATE accepted = [01] WHERE /i.test(text)) return true;
 	return false;
+}
+
+function json(response, status, payload) {
+	const body = JSON.stringify(payload);
+	response.writeHead(status, {
+		"Content-Type": "application/json; charset=utf-8",
+		"Content-Length": Buffer.byteLength(body),
+	});
+	response.end(body);
 }
 
 async function proxy(request, response, body) {
@@ -98,6 +109,51 @@ createServer((request, response) => {
 		return;
 	}
 
+	// Provenance. POST a render manifest to have its digest signed onto the
+	// chain; GET one back by transaction hash to check it. Both are deliberately
+	// separate endpoints so verification can be done by someone who never called
+	// the first one.
+	if (pathname === "/notarise") {
+		if (request.method !== "POST") {
+			response.writeHead(405).end();
+			return;
+		}
+		let body = "";
+		request.on("data", (chunk) => {
+			body += chunk;
+			// A manifest is prompts and digests, not media. Anything past this is
+			// not a manifest.
+			if (body.length > 200_000) request.destroy();
+		});
+		request.on("end", () => {
+			let manifest;
+			try {
+				manifest = JSON.parse(body);
+			} catch {
+				json(response, 400, { error: "That body is not JSON." });
+				return;
+			}
+			notarise(manifest).then(
+				(receipt) => json(response, 200, receipt),
+				(error) => json(response, 502, { error: String(error?.message ?? error).slice(0, 300) }),
+			);
+		});
+		return;
+	}
+
+	if (pathname.startsWith("/provenance/")) {
+		const hash = pathname.slice("/provenance/".length);
+		if (!/^[0-9a-f]{64}$/i.test(hash)) {
+			json(response, 400, { error: "That is not a transaction hash." });
+			return;
+		}
+		readBack(hash).then(
+			(record) => json(response, 200, record),
+			(error) => json(response, 404, { error: String(error?.message ?? error).slice(0, 300) }),
+		);
+		return;
+	}
+
 	if (pathname === "/ch") {
 		if (request.method !== "POST") {
 			response.writeHead(405).end();
@@ -135,5 +191,8 @@ createServer((request, response) => {
 	stream.on("error", () => response.destroy());
 	stream.pipe(response);
 }).listen(PORT, "0.0.0.0", () => {
-	console.log(`rendr-agentic-cinema on :${PORT} (ledger ${CH_URL ? "configured" : "absent"})`);
+	console.log(
+		`rendr-agentic-cinema on :${PORT} (ledger ${CH_URL ? "configured" : "absent"}, ` +
+			`notary ${process.env.STELLAR_SECRET ? "keyed" : "self-funding"})`,
+	);
 });
