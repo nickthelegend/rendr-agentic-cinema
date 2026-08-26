@@ -407,16 +407,20 @@ function DriftStrip({ frames }: { frames: Array<{ base64: string; mimeType: stri
 		<>
 			<h4 className="crep__sub">Drift across the cut</h4>
 			<p className="crep__note">
-				How far each shot sits from the middle of this film, by difference hash — 64 bits of
-				composition, palette and contrast. Not a likeness score: it does not know who is in
-				frame.{" "}
+				How far each shot sits from the middle of this film. Framing is a 64-bit difference
+				hash; grade is mean colour over a 4×4 grid. Measured separately, because a hash that
+				is robust to colour — which is why it works on photographs — cannot see a grade
+				shift at all. Neither number is a likeness score: they do not know who is in frame.{" "}
 				{wandered.length === 0
 					? "Nothing has wandered."
-					: `Shot${wandered.length === 1 ? "" : "s"} ${wandered
-							.map((shot) => shot.index + 1)
-							.join(
-								", ",
-							)} sit${wandered.length === 1 ? "s" : ""} well outside the rest.`}
+					: `${wandered
+							.map(
+								(shot) =>
+									`Shot ${shot.index + 1} drifts on ${
+										shot.because === "both" ? "framing and grade" : shot.because
+									}`,
+							)
+							.join("; ")}.`}
 			</p>
 			<div className="crep__drift">
 				{drift.map((shot) => (
