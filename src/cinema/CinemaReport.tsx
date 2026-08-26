@@ -132,12 +132,19 @@ export function CinemaReport({
 		});
 
 	// Escape closes it. An overlay without that is a trap on a laptop.
+	//
+	// Registered in the capture phase, which is not fussiness: something between
+	// the canvas and the window stops Escape from propagating — React Flow uses
+	// it to cancel a connection — so a bubble-phase listener here never fired
+	// for a real keypress. It worked under a synthetic event dispatched straight
+	// at the window, which is exactly the kind of false pass that makes a
+	// keyboard bug survive testing.
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape") onClose();
 		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
 	}, [onClose]);
 
 	return (
