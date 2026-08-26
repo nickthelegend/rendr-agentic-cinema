@@ -9,7 +9,15 @@ import { describe, expect, it } from "vitest";
 import type { CinemaGraph, CinemaNode } from "./nodes";
 import type { CinemaProvider } from "./provider";
 import { ProviderError } from "./provider";
-import { estimateRun, type LedgerEntry, markStale, needsRun, runGraph, sceneOrdinal } from "./run";
+import {
+	estimateRun,
+	filmSeed,
+	type LedgerEntry,
+	markStale,
+	needsRun,
+	runGraph,
+	sceneOrdinal,
+} from "./run";
 
 const node = (
 	id: string,
@@ -451,5 +459,46 @@ describe("a failure that never reached a prompt", () => {
 		const bad = entries.find((entry) => !entry.ok);
 		expect(bad?.prompt).toBeTruthy();
 		expect(bad?.prompt).toContain("Shot 9");
+	});
+});
+
+describe("the film seed", () => {
+	// "Render it again and get the same film" is a sentence worth being able to
+	// say. It is only true if the salt every generative call shares comes off
+	// the graph rather than being minted per run.
+	it("falls back to the film id when none has been set", () => {
+		expect(filmSeed(graph([]))).toBe("g");
+	});
+
+	it("prefers an explicit seed", () => {
+		expect(filmSeed({ ...graph([]), seed: "locked-2026" })).toBe("locked-2026");
+	});
+
+	it("ignores an empty seed rather than salting with nothing", () => {
+		expect(filmSeed({ ...graph([]), seed: "" })).toBe("g");
+	});
+
+	it("gives one film the same cast twice", async () => {
+		const film = () =>
+			graph([node("c", "character", { text: "a dock worker in her fifties" })]);
+		const first = await runGraph(provider(), film());
+		const second = await runGraph(provider(), film());
+		expect(first.graph.nodes[0].output?.seed).toBe(second.graph.nodes[0].output?.seed);
+	});
+
+	it("gives two films different people for the same description", async () => {
+		// Without the film salt every project that says "a dock worker in her
+		// fifties" would cast the identical person.
+		const one = {
+			...graph([node("c", "character", { text: "a dock worker" })]),
+			seed: "film-a",
+		};
+		const two = {
+			...graph([node("c", "character", { text: "a dock worker" })]),
+			seed: "film-b",
+		};
+		const a = await runGraph(provider(), one);
+		const b = await runGraph(provider(), two);
+		expect(a.graph.nodes[0].output?.seed).not.toBe(b.graph.nodes[0].output?.seed);
 	});
 });

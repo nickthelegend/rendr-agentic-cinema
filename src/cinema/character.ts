@@ -152,6 +152,15 @@ export async function lockCharacter(
  * it means duplicating a character node with the same description gets you the
  * same person rather than a stranger.
  */
+/**
+ * A stable seed for a piece of text.
+ *
+ * Deterministic on purpose: the same description must always lock the same
+ * face, or "run it again" quietly recasts the film. A film-level salt is mixed
+ * in by the caller so two films with the same character description still get
+ * different people — without it, every project that says "a dock worker in her
+ * fifties" would be the same dock worker.
+ */
 export function seedFrom(text: string): number {
 	let hash = 0x811c9dc5;
 	for (let i = 0; i < text.length; i++) {

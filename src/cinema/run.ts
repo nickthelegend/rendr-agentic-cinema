@@ -13,7 +13,13 @@
 //    real time. The node fails, the run continues, and the report says what is
 //    missing.
 
-import { gatherIngredients, lockCharacter, toNodeOutput, writeDescription } from "./character";
+import {
+	gatherIngredients,
+	lockCharacter,
+	seedFrom,
+	toNodeOutput,
+	writeDescription,
+} from "./character";
 import type { ShotCraft } from "./craft";
 import {
 	type CinemaGraph,
@@ -99,6 +105,17 @@ export function markStale(graph: CinemaGraph, nodeId: string): CinemaGraph {
 		),
 	};
 }
+
+/**
+ * The salt every generative call in one film shares.
+ *
+ * Read off the graph rather than minted per run, which is what makes "render it
+ * again and get the same film" true rather than aspirational. A film with no
+ * seed yet falls back to its id, so an old project stays reproducible from the
+ * moment it is opened rather than changing the first time it is re-rendered.
+ */
+export const filmSeed = (graph: CinemaGraph): string =>
+	typeof graph.seed === "string" && graph.seed ? graph.seed : graph.id;
 
 export async function runGraph(
 	provider: CinemaProvider,
@@ -250,7 +267,12 @@ async function runNode(
 	if (node.kind === "character") {
 		const ingredients = gatherIngredients(graph, node.id);
 		const described = await writeDescription(provider, node, ingredients);
-		const locked = await lockCharacter(provider, described.text, ingredients.references);
+		// Salted with the film's own seed, so re-rendering a film reproduces its
+		// cast rather than quietly recasting it — and two different films that
+		// happen to describe the same person still get different people.
+		const locked = await lockCharacter(provider, described.text, ingredients.references, {
+			seed: seedFrom(`${filmSeed(graph)}:${described.text}`),
+		});
 		return toNodeOutput(locked);
 	}
 

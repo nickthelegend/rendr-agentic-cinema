@@ -55,7 +55,16 @@ export function parseCinemaGraphs(value: unknown): CinemaGraph[] {
 			)
 			.map((edge) => ({ id: edge.id, from: edge.from, to: edge.to }));
 
-		out.push({ id: entry.id, name: entry.name, nodes, edges, auto: entry.auto === true });
+		out.push({
+			id: entry.id,
+			name: entry.name,
+			nodes,
+			edges,
+			auto: entry.auto === true,
+			// Carried, so a saved film reproduces its cast on reopening rather
+			// than recasting the first time it is re-rendered.
+			...(typeof entry.seed === "string" && entry.seed ? { seed: entry.seed } : {}),
+		});
 	}
 	return out;
 }

@@ -116,6 +116,9 @@ export interface CinemaShellProps {
 	onCast: () => void;
 	/** How far through a run we are, 0–1. Drives the fill on the render button. */
 	progress?: number;
+	/** Fraction of the film's call ceiling still unspent, 0–1. */
+	budgetLeft: number;
+	onPalette: () => void;
 	onAddNode: () => void;
 	onAgent: () => void;
 	onShortcuts: () => void;
@@ -311,6 +314,20 @@ export function CinemaShell(props: CinemaShellProps) {
 					>
 						<IconBolt />
 						<b>{callsLeft.toLocaleString()}</b>
+						{/* A number alone does not read as a limit. The bar burns
+						    down as the film spends, and turns red in the last
+						    fifth — before the ceiling stops a pass, not after. */}
+						<span
+							className="cshell__burn"
+							data-low={props.budgetLeft < 0.2 || undefined}
+							aria-hidden
+						>
+							<i
+								style={{
+									transform: `scaleX(${Math.max(0, Math.min(1, props.budgetLeft))})`,
+								}}
+							/>
+						</span>
 					</span>
 					<button
 						type="button"

@@ -13,9 +13,11 @@ import type { EditorApi } from "../palmier-ui/state";
 import { AUTO_DEBOUNCE_MS, confirmMessage, DEFAULT_CALL_CEILING, decideAuto } from "./auto";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
+import { CinemaPalette } from "./CinemaPalette";
 import { CinemaReport } from "./CinemaReport";
 import { CinemaShell } from "./CinemaShell";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
+import type { Command } from "./commands";
 import { readyScenes } from "./commit";
 import { exportFilm, shotListCsv } from "./deliver";
 import { addNode, autoLayout, preflight } from "./graphOps";
@@ -62,6 +64,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	const [report, setReport] = useState<null | "cast" | "ledger">(null);
 	// How much of the current run is done, for the fill on the render control.
 	const [progress, setProgress] = useState(0);
+	const [palette, setPalette] = useState(false);
 	// Flips once the ledger is connected, so the inspector re-renders with it.
 	const [ledgerReady, setLedgerReady] = useState(false);
 	// Incremented once a run's ledger writes have landed, so the inspector
@@ -175,6 +178,18 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, [api]);
+
+	// ⌘K. Bound at the window because the canvas swallows most keys, and every
+	// judge tries it within the first thirty seconds.
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+			event.preventDefault();
+			setPalette((open) => !open);
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, []);
 
 	/**
 	 * Lands the rendered scenes on the timeline.
@@ -559,6 +574,126 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		};
 	}, [graph.auto, graph.id, pending, running, run, notice]);
 
+	/**
+	 * Everything ⌘K can reach.
+	 *
+	 * Built from the same handlers the buttons use rather than a parallel set,
+	 * so a command and its toolbar twin can never drift apart — the failure mode
+	 * of every palette that is bolted on afterwards.
+	 */
+	const commands: Command[] = [
+		{
+			id: "render",
+			name: "Render",
+			group: "Film",
+			keywords: "run generate",
+			unavailable: pending === 0 ? "Everything is up to date" : undefined,
+			run: () => void run(),
+		},
+		{
+			id: "timeline",
+			name: "Put the scenes on the timeline",
+			group: "Film",
+			keywords: "commit cut clips",
+			unavailable: placeable === 0 ? "Nothing rendered yet" : undefined,
+			run: () => void commitToCut(),
+		},
+		{
+			id: "consistency",
+			name: "Consistency",
+			group: "Report",
+			keywords: "cast faces sheet proof",
+			run: () => setReport("cast"),
+		},
+		{
+			id: "ledger",
+			name: "Ledger",
+			group: "Report",
+			keywords: "spend clickhouse cost latency",
+			run: () => setReport("ledger"),
+		},
+		{
+			id: "tidy",
+			name: "Tidy the graph",
+			group: "Canvas",
+			keywords: "layout arrange",
+			run: () => api.updateCinemaGraph(autoLayout(graph)),
+		},
+		{
+			id: "shotlist",
+			name: "Shot list",
+			group: "Export",
+			keywords: "csv spreadsheet",
+			unavailable: shots.length === 0 ? "Decompose the story first" : undefined,
+			run: () =>
+				download(
+					`${graph.name || "film"} shot list.csv`,
+					"text/csv",
+					shotListCsv(graph, shots, api.timeline.fps),
+				),
+		},
+		{
+			id: "exportfilm",
+			name: "Export this film",
+			group: "Export",
+			keywords: "json save share",
+			run: () =>
+				download(
+					`${graph.name || "film"}.film.json`,
+					"application/json",
+					exportFilm(graph),
+				),
+		},
+		{
+			id: "auto",
+			name: graph.auto ? "Turn auto mode off" : "Turn auto mode on",
+			group: "Film",
+			keywords: "automatic",
+			run: () => api.updateCinemaGraph({ ...graph, auto: !graph.auto }),
+		},
+		{
+			id: "connection",
+			name: "Test the model connection",
+			group: "Film",
+			keywords: "api key gemini",
+			run: () => void testConnection(),
+		},
+		{
+			id: "undo",
+			name: "Undo",
+			group: "Canvas",
+			keywords: "back",
+			unavailable: state.cinemaUndo.length === 0 ? "Nothing to undo" : undefined,
+			run: api.undoCinema,
+		},
+		{
+			id: "grid",
+			name: showGrid ? "Hide the grid" : "Show the grid",
+			group: "Canvas",
+			run: () => setShowGrid((on) => !on),
+		},
+		{
+			id: "map",
+			name: showMap ? "Hide the minimap" : "Show the minimap",
+			group: "Canvas",
+			run: () => setShowMap((on) => !on),
+		},
+		{
+			id: "thumbs",
+			name: showThumbs ? "Hide previews" : "Show previews",
+			group: "Canvas",
+			keywords: "thumbnails images",
+			run: () => setShowThumbs((on) => !on),
+		},
+		{
+			id: "back",
+			name: "Back to the timeline",
+			group: "Film",
+			keywords: "editor close",
+			run: () => api.setActiveCinemaGraph(null),
+		},
+	];
+
 	return (
 		<>
 			<CinemaShell
@@ -578,6 +713,8 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				pending={pending}
 				costUsd={cost.usd}
 				progress={progress}
+				budgetLeft={Math.max(0, (DEFAULT_CALL_CEILING - spent) / DEFAULT_CALL_CEILING)}
+				onPalette={() => setPalette(true)}
 				onRender={() => run()}
 				callsLeft={Math.max(0, DEFAULT_CALL_CEILING - spent)}
 				auto={graph.auto}
@@ -710,6 +847,10 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 						))}
 					</div>
 				) : null}
+				{palette ? (
+					<CinemaPalette commands={commands} onClose={() => setPalette(false)} />
+				) : null}
+
 				{report ? (
 					<CinemaReport
 						graph={graph}

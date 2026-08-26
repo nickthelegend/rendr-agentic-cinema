@@ -233,6 +233,14 @@ export interface CinemaEdge {
 }
 
 export interface CinemaGraph {
+	/**
+	 * Salt shared by every generative call in this film.
+	 *
+	 * Absent on films made before seeds existed, which fall back to the graph
+	 * id — so an old project stays reproducible rather than recasting itself the
+	 * first time it is re-rendered.
+	 */
+	seed?: string;
 	id: string;
 	name: string;
 	nodes: CinemaNode[];

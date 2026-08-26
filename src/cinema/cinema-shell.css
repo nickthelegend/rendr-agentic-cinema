@@ -1230,3 +1230,105 @@
 		transition: none;
 	}
 }
+
+/* ── command palette ─────────────────────────────────────────── */
+
+.cpal {
+	position: absolute;
+	inset: 0;
+	z-index: 9;
+	display: flex;
+	justify-content: center;
+	padding-top: 14vh;
+	background: rgba(6, 6, 8, 0.6);
+	backdrop-filter: blur(4px);
+	animation: crep-in 120ms ease-out;
+}
+.cpal__box {
+	width: min(560px, 92%);
+	height: fit-content;
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	background: #17171b;
+	box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6);
+	overflow: hidden;
+	animation: crep-rise 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.cpal__input {
+	width: 100%;
+	height: 50px;
+	padding: 0 16px;
+	border: 0;
+	border-bottom: 1px solid var(--line-soft);
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 15px;
+	outline: none;
+}
+.cpal__list {
+	list-style: none;
+	margin: 0;
+	padding: 6px;
+	max-height: 46vh;
+	overflow: auto;
+}
+.cpal__list button {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	padding: 9px 11px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+.cpal__list button[data-on] {
+	background: rgba(255, 255, 255, 0.09);
+}
+.cpal__list button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+.cpal__list em {
+	font-style: normal;
+	font-size: 11px;
+	color: var(--ink-faint);
+}
+.cpal__none {
+	padding: 14px 12px;
+	font-size: 12.5px;
+	color: var(--ink-dim);
+}
+
+/* The budget, burnt down. A number alone does not read as a limit. */
+.cshell__credits {
+	position: relative;
+}
+.cshell__burn {
+	position: absolute;
+	left: 10px;
+	right: 10px;
+	bottom: 3px;
+	height: 2px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.12);
+	overflow: hidden;
+}
+.cshell__burn i {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: #e8b93c;
+	transform-origin: left;
+	transition: transform 420ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.cshell__burn[data-low] i {
+	background: #e0556a;
+}
