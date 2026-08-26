@@ -298,10 +298,18 @@ async function runNode(
 	if (specs.length === 0) {
 		throw new Error("No scenes to render — the story upstream has not decomposed yet.");
 	}
-	const which = Math.min(
-		numberParam(node, "sceneIndex") ?? sceneOrdinal(graph, node),
-		specs.length - 1,
-	);
+	const which = numberParam(node, "sceneIndex") ?? sceneOrdinal(graph, node);
+	// Refuse rather than clamp. This was `Math.min(which, specs.length - 1)`,
+	// which meant a film with five scene nodes over a three-shot story rendered
+	// shots 1, 2, 3, 3, 3 — three identical pictures, paid for separately, with
+	// nothing anywhere saying so. A cut that is quietly wrong is worse than one
+	// that is loudly incomplete.
+	if (which >= specs.length) {
+		throw new Error(
+			`This scene asks for shot ${which + 1}, but the story only produced ${specs.length}. ` +
+				`Lower "Which shot", or give the story more beats.`,
+		);
+	}
 	const world = inputs.find((input) => input.kind === "world")?.output?.text;
 	// Craft comes off the node, and off the film's palette when the node has no
 	// opinion. A palette set once and applied everywhere is the whole reason

@@ -26,6 +26,14 @@ export interface CinemaInspectorProps {
 	nodeId: string | null;
 	/** Absent when Clickhouse is not configured; the history panel says so. */
 	ledger?: Ledger | null;
+	/**
+	 * Bumped once a run's writes have landed.
+	 *
+	 * Without it the take history is fetched when a node is selected and never
+	 * again, so re-running a node left the panel showing the old list — and a
+	 * verdict was then offered against a take that was no longer the latest.
+	 */
+	historyVersion?: number;
 	onChange: (next: CinemaGraph) => void;
 	onRun: (nodeId: string) => void;
 	onNotice: (message: string, tone?: "error" | "info") => void;
@@ -35,6 +43,7 @@ export function CinemaInspector({
 	graph,
 	nodeId,
 	ledger,
+	historyVersion,
 	onChange,
 	onRun,
 	onNotice,
@@ -66,7 +75,7 @@ export function CinemaInspector({
 		return () => {
 			live = false;
 		};
-	}, [ledger, graph.id, nodeId]);
+	}, [ledger, graph.id, nodeId, historyVersion]);
 
 	/**
 	 * What this node has already been asked, newest first.
@@ -92,7 +101,7 @@ export function CinemaInspector({
 		return () => {
 			live = false;
 		};
-	}, [ledger, graph.id, nodeId]);
+	}, [ledger, graph.id, nodeId, historyVersion]);
 	/**
 	 * Writes a change and invalidates everything it reaches.
 	 *

@@ -1,0 +1,146 @@
+# Test plan — rendr-agentic-cinema
+
+Executed against the running app in a real Chromium (Browser pane), a real
+ClickHouse 24.8 in Docker, and real file downloads. Every item states what
+*correct* means before it is run. Console and network are inspected on every
+item; any error anywhere fails the item.
+
+**Environment**
+- App: `vite --config vite.ui.config.ts`, `http://localhost:5233/?windowType=editor-next`
+- DB: ClickHouse 24.8.14.39, container `rendr-clickhouse`, user `cinema`, db `cinema`
+- Model provider: **no Gemini API key exists in this repo or environment.**
+  Items that require a real generative call are marked UNTESTABLE and are not
+  claimed as passes. Everything else runs for real.
+
+---
+
+## A. Shell chrome
+
+| # | Item | Correct means |
+|---|---|---|
+| A1 | Film view takes the whole window | With a film open, `.pmr-titlebar` is `display:none`, `.cshell` fills the viewport, exactly one top bar exists |
+| A2 | Menus live in the shell bar | File/Edit/View/Timeline/Help render inside `.cshell__bar` and open on click |
+| A3 | Top bar right cluster | EN, share, Connection, ⚡budget, Auto toggle, notes, cast, Agent all render; none is a no-op |
+| A4 | Budget is real | ⚡ value equals `DEFAULT_CALL_CEILING (60) − calls recorded in ClickHouse for this film`, and decreases after a run |
+| A5 | Agent button toggles the agent rail | One click hides it, second click shows it |
+| A6 | View segment | Clapper is active on canvas; timeline icon returns to the editor (film closes, titlebar returns) |
+| A7 | Dock renders | Two floating pills; Assets + 5 tools + zoom on the left, 9 tools on the right; cursor tool is the inverted/active one |
+| A8 | Presence pill | Top-right shows a people icon and `0` |
+
+## B. Film lifecycle
+
+| # | Item | Correct means |
+|---|---|---|
+| B1 | New Film… creates an empty film | Dialog accepts a name; canvas shows the empty state; graph has 0 nodes; title bar shows the typed name |
+| B2 | Empty state content | Sparkle badge, heading "Double-click the canvas to generate nodes freely", subtitle, 4 starter cards, Template library + Upload reference |
+| B3 | Starter card creates a node | Clicking each of the 4 cards adds exactly one node of the mapped kind (story / character / scene / world) and dismisses the empty state |
+| B4 | Template: Short film | 14 nodes, 0 preflight problems, already laid out (autoLayout is a fixed point), every scene has a distinct `sceneIndex` |
+| B5 | Template: Advertisement | Same contract as B4 |
+| B6 | Template: Music video | Same contract as B4, 17 nodes |
+| B7 | Template: Documentary | Same contract as B4 |
+| B8 | Export Film… | Downloads `<name>.film.json`; content is `format: "rendr-cinema/1"`, node/edge counts match the graph, **no base64 image bytes** |
+| B9 | Import Film… | A previously exported file re-creates the film with the same node and edge counts, every node `status: "idle"` |
+| B10 | Import rejects junk | Non-JSON → "That file is not JSON."; wrong format → "Unknown format"; 0 nodes → "That film has no nodes." No crash, no console error |
+
+## C. Graph editing
+
+| # | Item | Correct means |
+|---|---|---|
+| C1 | Double-click adds a node | Double-clicking empty canvas opens a 10-item picker at the pointer; choosing a kind creates that node at that position; the pane does **not** zoom |
+| C2 | Picker dismisses | Clicking the pane closes the picker without creating anything |
+| C3 | Palette adds a node | Each palette button adds one node of its kind |
+| C4 | Node selection | Single click selects and fills the inspector; clicking empty canvas deselects and shows the overview |
+| C5 | Duplicate | Copies params and **inbound** edges, not outbound; copy is `idle` with no output; ids stay unique |
+| C6 | Legal connection | Character → Story connects and renders an edge |
+| C7 | Illegal connection refused **with a reason** | Attempting e.g. Timeline → Character is refused and a toast explains why |
+| C8 | Tidy | Every node sits strictly right of all its inputs; roots share the first column; node count unchanged |
+| C9 | Undo | ⌘Z steps the graph back **and the canvas follows** |
+| C10 | Delete | Removing a node removes every edge that touched it |
+
+## D. Inspector
+
+| # | Item | Correct means |
+|---|---|---|
+| D1 | Per-kind fields | Character shows "Who they are" + Voice; World shows Palette; Scene shows Aspect, Which shot, Craft; Story shows Target length |
+| D2 | Craft controls | 5 selects populated from `CRAFT_OPTIONS` (11/9/8/11/8 options incl. "from the shot"), reference-strength slider, "Keep out" field |
+| D3 | Craft reaches the prompt | A chosen lens/stock appears verbatim in the prompt recorded in ClickHouse for that node |
+| D4 | Inference when unset | With nothing chosen, the recorded prompt still contains a shot-size clause and a lighting clause derived from the shot's own prose |
+| D5 | Staleness | Editing a character marks it and every downstream node stale; unrelated branches are untouched; Render count changes to match |
+| D6 | Previous takes | After a run, the node's history lists the take with timestamp, model and duration, read from ClickHouse |
+| D7 | Keep / Discard | Clicking Keep sets `accepted = 1` in ClickHouse for that exact row and the row reads "kept" |
+| D8 | Overview when nothing selected | Prompt leaderboard lists kept prompts with counts; call total shown; no blank-prompt rows |
+
+## E. Run pipeline
+
+| # | Item | Correct means |
+|---|---|---|
+| E1 | Render runs the graph | Every generative node ends `ready`; nodes show their output inline; button becomes "Up to date" |
+| E2 | Progress is visible | Nodes pass through `running` before `ready` |
+| E3 | Cost on the button | Button reads `Render N · ~$X` where N = stale generative nodes and X = `estimateCost` |
+| E4 | Skip what is fresh | Re-render with nothing stale does nothing and the button is disabled |
+| E5 | Real model call | **UNTESTABLE — no API key.** |
+| E6 | Failure isolation | A failing node does not discard already-rendered siblings |
+
+## F. Ledger (real ClickHouse)
+
+| # | Item | Correct means |
+|---|---|---|
+| F1 | Schema created | `cinema.generations` exists with the 13 declared columns, MergeTree, `ORDER BY (graph_id, at)` |
+| F2 | Every call is a row | A run of N generative nodes inserts exactly N rows |
+| F3 | Prompt is recorded | `prompt` is non-empty on **every** row, including story and world |
+| F4 | Seed / model / duration | `model` non-empty, `elapsed_ms` > 0, `ok = 1` |
+| F5 | `takesFor` reads back | Inspector history matches the rows in the table for that node |
+| F6 | `judge` writes | Keep sets `accepted = 1`; Discard sets `0`; addressed by exact `at`, and the mutation is accepted by a real server |
+| F7 | `whatWorks` | Returns only kept, non-empty prompts, ranked; scoped to the film |
+| F8 | `spentOn` | Equals the real row count for that film |
+| F9 | Resilience | With ClickHouse stopped, a render still completes and the panel still renders; no unhandled rejection |
+
+## G. Auto mode
+
+| # | Item | Correct means |
+|---|---|---|
+| G1 | Toggle reflects state | Button switches Auto off ↔ Auto on and persists on the graph |
+| G2 | Debounce | A pass starts ~2s after the last change, not immediately |
+| G3 | Confirm above threshold | A pass of >4 nodes asks first, naming the node count and the spend |
+| G4 | Ceiling refuses | With the ceiling below what the pass needs, nothing runs and the message names both numbers and how to proceed |
+| G5 | Ledger down pauses | With ClickHouse stopped, auto mode refuses rather than treating spend as unknown-and-therefore-fine |
+
+## H. Preflight and cut notes
+
+| # | Item | Correct means |
+|---|---|---|
+| H1 | Preflight blocks a run | With a real problem, Render refuses and the reason is shown |
+| H2 | New film is quiet | A brand-new empty film shows no problem chips |
+| H3 | Scene index overflow | A scene asking for a shot the story lacks is reported with both numbers |
+| H4 | Cut notes | Coverage/pacing/structure notes appear for a decomposed cut and are accurate |
+
+## I. Delivery
+
+| # | Item | Correct means |
+|---|---|---|
+| I1 | Shot list CSV | Downloads; header + one row per shot; timecode accumulates at project fps; dialogue with commas/quotes is escaped and round-trips |
+| I2 | Disabled before decomposition | With no shots, the control refuses with a reason rather than downloading an empty file |
+
+## J. Timeline commit
+
+| # | Item | Correct means |
+|---|---|---|
+| J1 | Scenes become clips | "To timeline" imports the stills and places one clip per rendered scene on V1, in story order |
+| J2 | Durations | Each clip's length = `durationSeconds × fps`; project duration = sum |
+| J3 | Camera move | Each clip carries a Ken Burns move |
+| J4 | Refuses when nothing rendered | Control is disabled / refuses with a reason |
+
+## K. Connection check
+
+| # | Item | Correct means |
+|---|---|---|
+| K1 | No-key path is honest | Test connection reports the missing key and states that a Gemini app subscription carries no API quota |
+| K2 | Five real checks with a key | **UNTESTABLE — no API key.** |
+
+## L. Cleanliness
+
+| # | Item | Correct means |
+|---|---|---|
+| L1 | Console | Zero errors and zero unhandled rejections across every item above |
+| L2 | Network | Zero failed requests; every ClickHouse call returns 200 |
+| L3 | No mocks in the tested path | The stub provider is the only stand-in and is reached **only** because no API key exists; the ledger, persistence, downloads and timeline are all real |

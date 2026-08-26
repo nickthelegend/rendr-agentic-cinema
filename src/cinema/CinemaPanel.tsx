@@ -54,11 +54,45 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	// every run rather than polled: nothing else moves it.
 	const [spent, setSpent] = useState(0);
 	const [showMap, setShowMap] = useState(false);
+	// Flips once the ledger is connected, so the inspector re-renders with it.
+	const [ledgerReady, setLedgerReady] = useState(false);
+	// Incremented once a run's ledger writes have landed, so the inspector
+	// refetches a node's history instead of showing the list from before it ran.
+	const [historyVersion, setHistoryVersion] = useState(0);
 	const notice = useCallback(
 		(message: string, tone?: "error" | "info") =>
 			toast(message, tone === "error" ? "error" : undefined),
 		[toast],
 	);
+
+	/**
+	 * Connects the ledger and makes sure its table exists.
+	 *
+	 * Called when a film opens rather than only when a render starts. Deferring
+	 * it to the first run meant everything that *reads* the ledger was dead
+	 * until something had been written in this session: the budget sat at the
+	 * ceiling, a node's take history never loaded, and the prompt leaderboard
+	 * stayed empty even with rows in the table from earlier work.
+	 */
+	const connectLedger = useCallback(async (): Promise<Ledger | null> => {
+		if (ledger.current) return ledger.current;
+		const url = import.meta.env.VITE_CLICKHOUSE_URL ?? "";
+		if (!url) return null;
+		const next = createClickhouseLedger({
+			url,
+			user: import.meta.env.VITE_CLICKHOUSE_USER ?? "default",
+			password: import.meta.env.VITE_CLICKHOUSE_PASSWORD ?? "",
+		});
+		try {
+			await next.init();
+		} catch (error) {
+			// Bookkeeping never blocks a film. Say so once and carry on.
+			notice(`Ledger unavailable: ${String(error).slice(0, 120)}`, "error");
+			return null;
+		}
+		ledger.current = next;
+		return next;
+	}, [notice]);
 
 	if (!graph) {
 		return (
@@ -335,26 +369,17 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 			}
 			// The ledger is optional and never blocks a render. Configured, it
 			// records every call; absent, the run is identical minus the history.
-			if (!ledger.current) {
-				const url = import.meta.env.VITE_CLICKHOUSE_URL ?? "";
-				if (url) {
-					ledger.current = createClickhouseLedger({
-						url,
-						user: import.meta.env.VITE_CLICKHOUSE_USER ?? "default",
-						password: import.meta.env.VITE_CLICKHOUSE_PASSWORD ?? "",
-					});
-					// Failing to create the table must not stop the film.
-					await ledger.current.init().catch((error) => {
-						notice(`Ledger unavailable: ${String(error).slice(0, 120)}`, "error");
-						ledger.current = null;
-					});
-				}
-			}
+			await connectLedger();
 
 			setRunning(true);
 			try {
 				const report = await runGraph(provider, graph, {
 					only,
+					// An explicit "Re-run" on a node means redo it, even though it
+					// already has an output. Without this, needsRun saw a ready
+					// node, skipped it, and the button did nothing at all — it was
+					// only ever able to run a node that had never run.
+					force: only !== undefined,
 					// Progress is written straight back to the graph, so the canvas
 					// shows a node going running → ready while the rest still wait.
 					// Commit exactly what the runner has, not a patch onto the
@@ -408,26 +433,37 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				// render and an automatic one agree.
 				void ledger.current
 					?.spentOn(graph.id)
-					.then((total) => setSpent(total.calls))
+					.then((total) => {
+						setSpent(total.calls);
+						// The round-trip that reads the spend also proves the run's
+						// inserts have landed, which is the moment the history is
+						// worth refetching.
+						setHistoryVersion((version) => version + 1);
+					})
 					.catch(() => {});
 			}
 		},
 		[api, graph, notice, running],
 	);
 
-	// Once when the film opens, so the budget is right before anything is run.
+	// Once when the film opens, so the budget, the take history and the prompt
+	// leaderboard are all live before anything has been run this session.
 	useEffect(() => {
 		let live = true;
-		void ledger.current
-			?.spentOn(graph.id)
-			.then((total) => {
-				if (live) setSpent(total.calls);
-			})
-			.catch(() => {});
+		void connectLedger().then((led) => {
+			if (!live || !led) return;
+			setLedgerReady(true);
+			return led
+				.spentOn(graph.id)
+				.then((total) => {
+					if (live) setSpent(total.calls);
+				})
+				.catch(() => {});
+		});
 		return () => {
 			live = false;
 		};
-	}, [graph.id]);
+	}, [graph.id, connectLedger]);
 
 	/**
 	 * Auto mode.
@@ -543,7 +579,8 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 						<CinemaInspector
 							graph={graph}
 							nodeId={state.selectedCinemaNodeId}
-							ledger={ledger.current}
+							ledger={ledgerReady ? ledger.current : null}
+							historyVersion={historyVersion}
 							onChange={api.updateCinemaGraph}
 							onRun={(nodeId) => run([nodeId])}
 							onNotice={notice}

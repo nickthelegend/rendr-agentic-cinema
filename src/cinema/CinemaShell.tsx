@@ -195,21 +195,15 @@ export function CinemaShell(props: CinemaShellProps) {
 		<div className="cshell" data-map={props.showMap || undefined}>
 			<header className="cshell__bar">
 				<div className="cshell__cluster">
-					<button
-						type="button"
-						className="cshell__glyph"
-						title="Panels"
-						aria-label="Panels"
-					>
+					<span className="cshell__mark" aria-hidden>
 						<IconPanel />
-					</button>
-					<button
-						type="button"
-						className="cshell__glyph cshell__glyph--tight"
-						aria-label="Film menu"
-					>
-						<IconChevron />
-					</button>
+					</span>
+					{/* One bar, not two. The editor's own title strip is hidden while
+					    a film is open, so if the menus are not rendered here they are
+					    not rendered anywhere — which is exactly what happened: File,
+					    Export Film and Import Film were all unreachable from inside a
+					    film. */}
+					{props.menu}
 					<span className="cshell__rule" />
 					<button
 						type="button"

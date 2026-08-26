@@ -102,36 +102,36 @@ function placeholder(prompt: string, aspect: string, seed: number): ImageBytes {
  * continuity checker has something realistic to pass, rather than a set that
  * trivially satisfies it.
  */
-function cannedScenes(castNames: string[]): string {
+function cannedScenes(castNames: string[], beats: number): string {
 	const who = castNames.length ? [castNames[0]] : [];
+	// One shot per beat, which is the shape a real decomposition returns. The
+	// first version always returned exactly three regardless of the story, so a
+	// five-beat film came back with five scene nodes and three shots to fill
+	// them — and the runner quietly rendered the last shot three times. A test
+	// double may invent the content; it must not invent a different shape.
+	const FRAMINGS = [
+		{ camera: "wide establishing, static", action: "the street empties" },
+		{ camera: "medium, slow push", action: "they stop under the awning" },
+		{ camera: "close on their hands", action: "they unfold the paper" },
+		{ camera: "over the shoulder, favouring them", action: "they read it again" },
+		{ camera: "extreme close on their eyes", action: "they decide" },
+		{ camera: "wide, static, holding", action: "they walk out of frame" },
+	];
 	return JSON.stringify({
-		scenes: [
-			{
-				characterNames: [],
+		scenes: Array.from({ length: Math.max(1, beats) }, (_, index) => {
+			const framing = FRAMINGS[index % FRAMINGS.length];
+			return {
+				characterNames: index === 0 ? [] : who,
 				location: "a rain-dark street",
 				timeOfDay: "night",
-				camera: "wide establishing, static",
-				action: "the street empties",
-				durationSeconds: 4,
-			},
-			{
-				characterNames: who,
-				location: "a rain-dark street",
-				timeOfDay: "night",
-				camera: "medium, slow push",
-				action: "they stop under the awning",
-				durationSeconds: 3.5,
-			},
-			{
-				characterNames: who,
-				location: "a rain-dark street",
-				timeOfDay: "night",
-				camera: "close on their hands",
-				action: "they unfold the paper",
-				dialogue: "You kept it.",
-				durationSeconds: 3,
-			},
-		],
+				camera: framing.camera,
+				action: framing.action,
+				// Varied so the pacing check has something realistic to judge
+				// rather than a metronome it would always flag.
+				durationSeconds: [4, 3.5, 3, 5, 2.5, 4.5][index % 6],
+				...(index === 2 ? { dialogue: "You kept it." } : {}),
+			};
+		}),
 	});
 }
 
@@ -147,7 +147,10 @@ export function createStubProvider(): CinemaProvider {
 				// what makes the name-matching path testable.
 				const match = /The cast: ([^.]+)\./.exec(request.prompt);
 				const names = match ? match[1].split(",").map((name) => name.trim()) : [];
-				return { text: cannedScenes(names), model: "stub-text", elapsedMs: 140 };
+				// The beat lines are numbered in the prompt; counting them is how
+				// the stub returns one shot per beat the way a model would.
+				const beats = (request.prompt.match(/^\d+\. \[/gm) ?? []).length;
+				return { text: cannedScenes(names, beats), model: "stub-text", elapsedMs: 140 };
 			}
 			return {
 				text: `[stub] ${request.prompt.slice(0, 160)}`,

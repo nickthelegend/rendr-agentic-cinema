@@ -373,3 +373,62 @@ describe("what the ledger is told", () => {
 		expect(bad[0].prompt).toBeTruthy();
 	});
 });
+
+describe("a scene that asks for a shot the story does not have", () => {
+	// It used to clamp to the last shot. Five scene nodes over a three-shot
+	// story rendered 1, 2, 3, 3, 3 — three identical pictures, each paid for,
+	// with nothing saying so.
+	const overreaching = () =>
+		graph(
+			[
+				node("s", "story", { text: "a premise" }),
+				node("sc0", "scene", { params: { sceneIndex: 0 } }),
+				node("sc9", "scene", { label: "Shot 10", params: { sceneIndex: 9 } }),
+			],
+			[
+				["s", "sc0"],
+				["s", "sc9"],
+			],
+		);
+
+	it("fails that node instead of duplicating another shot", async () => {
+		const report = await runGraph(provider(), overreaching());
+		const bad = report.failed.find((entry) => entry.nodeId === "sc9");
+		expect(bad?.error).toMatch(/asks for shot 10, but the story only produced 1/);
+	});
+
+	it("still renders the scenes that are in range", async () => {
+		const report = await runGraph(provider(), overreaching());
+		expect(report.ran).toContain("sc0");
+	});
+});
+
+describe("an explicit re-run", () => {
+	// The inspector's "Re-run" button passes `only`. Without force, needsRun
+	// saw a node that was already ready and skipped it, so the button did
+	// nothing for exactly the case it exists for.
+	it("re-runs a node that already has an output", async () => {
+		const ready = graph([
+			node("w", "world", {
+				text: "a port town",
+				status: "ready",
+				output: { text: "described", model: "m" },
+			}),
+		]);
+		const report = await runGraph(provider(), ready, { only: ["w"], force: true });
+		expect(report.ran).toEqual(["w"]);
+		expect(report.skipped).toEqual([]);
+	});
+
+	it("still skips a ready node on a plain whole-graph run", async () => {
+		const ready = graph([
+			node("w", "world", {
+				text: "a port town",
+				status: "ready",
+				output: { text: "described", model: "m" },
+			}),
+		]);
+		const report = await runGraph(provider(), ready);
+		expect(report.skipped).toEqual(["w"]);
+	});
+});
