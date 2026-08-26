@@ -377,7 +377,14 @@ function DriftStrip({ frames }: { frames: Array<{ base64: string; mimeType: stri
 		let live = true;
 		Promise.all(frames.map((frame) => hashFrame(frame.base64, frame.mimeType)))
 			.then((hashes) => {
-				if (live) setDrift(driftAcross(hashes));
+				if (live) {
+					setDrift(
+						driftAcross(
+							hashes.map((hash) => hash.structure),
+							hashes.map((hash) => hash.colour),
+						),
+					);
+				}
 			})
 			// Decoding can fail on a browser without OffscreenCanvas. Saying so
 			// beats an empty strip that reads as "no drift".
@@ -417,7 +424,10 @@ function DriftStrip({ frames }: { frames: Array<{ base64: string; mimeType: stri
 						key={shot.index}
 						className="crep__driftbar"
 						data-outlier={shot.outlier || undefined}
-						title={`Shot ${shot.index + 1}: ${shot.bits} of 64 bits from the middle`}
+						title={
+							`Shot ${shot.index + 1} — framing ${shot.bits}/64 bits from the middle, ` +
+							`grade ${Math.round(shot.palette * 100)}% off`
+						}
 					>
 						<span style={{ height: `${Math.round(shot.closeness * 100)}%` }} />
 						<em>{shot.index + 1}</em>

@@ -5,11 +5,21 @@
 // scale past about eight shots and it gives a viewer nothing to disagree with.
 // This puts a number next to it.
 //
-// **What this measures, precisely.** A difference hash — sixty-four bits, each
-// one recording whether a pixel is brighter than the one to its right in a 9×8
-// greyscale reduction. Comparing two of them counts differing bits. That is an
-// *image* distance: composition, palette, contrast, the general shape of the
-// frame.
+// **What this measures, precisely.** Two things, because one was not enough.
+//
+// A difference hash — sixty-four bits, each recording whether a pixel is
+// brighter than the one to its right in a 9×8 greyscale reduction — catches
+// *structure*: framing, where the mass of the picture sits, the general shape
+// of the frame. It is deliberately blind to overall brightness and to colour;
+// that robustness is the whole reason the technique works on photographs.
+//
+// Which means it cannot answer "has the palette wandered?" at all. I shipped a
+// version that claimed it did, and the five stub frames — visibly teal, blue
+// and slate — all scored identical, because compositionally they are. So there
+// is a second signature: mean colour over a 4×4 grid, compared channel by
+// channel. Structure and palette are reported as separate numbers rather than
+// blended into one, since a shot that is framed oddly and a shot that is graded
+// oddly are different notes to give.
 //
 // **What it is not.** It is not a face-similarity score and nothing here claims
 // it is. Two shots of different people under the same sodium light in the same
@@ -81,12 +91,16 @@ export function medianHash(hashes: readonly (readonly boolean[])[]): boolean[] {
 
 export interface Drift {
 	index: number;
-	/** Differing bits from the cut's median. */
+	/** Differing structure bits from the cut's median. */
 	bits: number;
-	/** 0 to 1, where 1 is the middle of the cut and 0 is its opposite. */
+	/** 0 to 1, where 1 is the middle of the cut's framing and 0 is its opposite. */
 	closeness: number;
+	/** Mean channel distance from the cut's median colour, 0 to 1. */
+	palette: number;
 	/** True when this shot sits further out than the rest of the cut does. */
 	outlier: boolean;
+	/** Which of the two put it there, for a note worth reading. */
+	because: "framing" | "grade" | "both" | null;
 }
 
 /**
@@ -98,21 +112,104 @@ export interface Drift {
  * an outlier and none in the other. Anything past twice the median distance is
  * unusual *for this film*.
  */
-export function driftAcross(hashes: readonly (readonly boolean[])[]): Drift[] {
+export function driftAcross(
+	hashes: readonly (readonly boolean[])[],
+	colours: readonly (readonly number[])[] = [],
+): Drift[] {
 	if (hashes.length === 0) return [];
 	const middle = medianHash(hashes);
 	const bits = hashes.map((hash) => distance(hash, middle));
-	const sorted = [...bits].sort((a, b) => a - b);
-	const median = sorted[Math.floor(sorted.length / 2)];
-	// A cut where every shot sits on the median has no outliers, and doubling
-	// zero would make every shot one.
-	const limit = Math.max(median * 2, 6);
-	return bits.map((count, index) => ({
-		index,
-		bits: count,
-		closeness: Number((1 - count / (middle.length || 1)).toFixed(3)),
-		outlier: count > limit,
-	}));
+	const structureLimit = Math.max(spreadLimit(bits), 6);
+
+	const middleColour = medianColour(colours);
+	const palettes = colours.map((colour) => colourDistance(colour, middleColour));
+	// Colour distances are fractions, so the floor is a fraction too: 0.06 of a
+	// channel is roughly where a grade shift stops being invisible.
+	const paletteLimit = Math.max(spreadLimit(palettes), 0.06);
+
+	return bits.map((count, index) => {
+		const framing = count > structureLimit;
+		const grade = palettes.length > index && palettes[index] > paletteLimit;
+		return {
+			index,
+			bits: count,
+			closeness: Number((1 - count / (middle.length || 1)).toFixed(3)),
+			palette: Number((palettes[index] ?? 0).toFixed(3)),
+			outlier: framing || grade,
+			because: framing && grade ? "both" : framing ? "framing" : grade ? "grade" : null,
+		};
+	});
+}
+
+/**
+ * Twice the median of a set — the line past which something is unusual *here*.
+ *
+ * A constant would be wrong in both directions: noir has more distance between
+ * its shots than a flat documentary, so one threshold calls every shot in one
+ * an outlier and none in the other.
+ */
+function spreadLimit(values: readonly number[]): number {
+	if (values.length === 0) return Number.POSITIVE_INFINITY;
+	const sorted = [...values].sort((a, b) => a - b);
+	return sorted[Math.floor(sorted.length / 2)] * 2;
+}
+
+export const COLOUR_GRID = 4;
+
+/**
+ * Mean colour over a 4×4 grid — 48 numbers, three channels a cell.
+ *
+ * Coarser than the structure grid on purpose. Palette drift is a property of
+ * whole regions of a frame, and a fine grid would mostly measure what is in
+ * shot rather than how it is graded.
+ */
+export function colourSignature(rgba: Uint8ClampedArray, width: number, height: number): number[] {
+	if (width < COLOUR_GRID || height < COLOUR_GRID) {
+		throw new Error("That image is smaller than the colour grid.");
+	}
+	const signature: number[] = [];
+	for (let cellY = 0; cellY < COLOUR_GRID; cellY++) {
+		for (let cellX = 0; cellX < COLOUR_GRID; cellX++) {
+			const x0 = Math.floor((cellX * width) / COLOUR_GRID);
+			const x1 = Math.max(x0 + 1, Math.floor(((cellX + 1) * width) / COLOUR_GRID));
+			const y0 = Math.floor((cellY * height) / COLOUR_GRID);
+			const y1 = Math.max(y0 + 1, Math.floor(((cellY + 1) * height) / COLOUR_GRID));
+			let r = 0;
+			let g = 0;
+			let b = 0;
+			let counted = 0;
+			for (let y = y0; y < y1; y++) {
+				for (let x = x0; x < x1; x++) {
+					const at = (y * width + x) * 4;
+					r += rgba[at];
+					g += rgba[at + 1];
+					b += rgba[at + 2];
+					counted++;
+				}
+			}
+			signature.push(r / counted, g / counted, b / counted);
+		}
+	}
+	return signature;
+}
+
+/** The per-channel median of a set of signatures. */
+export function medianColour(signatures: readonly (readonly number[])[]): number[] {
+	if (signatures.length === 0) return [];
+	const middle: number[] = [];
+	for (let i = 0; i < signatures[0].length; i++) {
+		const column = signatures.map((signature) => signature[i]).sort((a, b) => a - b);
+		middle.push(column[Math.floor(column.length / 2)]);
+	}
+	return middle;
+}
+
+/** Mean absolute channel difference, as a fraction of full range. */
+export function colourDistance(a: readonly number[], b: readonly number[]): number {
+	if (a.length === 0 || b.length === 0 || a.length !== b.length) return 0;
+	let total = 0;
+	for (let i = 0; i < a.length; i++) total += Math.abs(a[i] - b[i]);
+	return total / a.length / 255;
 }
 
 /**
@@ -158,7 +255,10 @@ export function reduce(rgba: Uint8ClampedArray, width: number, height: number): 
  * Browser only — it needs a canvas to decode. Kept apart from everything above
  * so the arithmetic can be tested without one.
  */
-export async function hashFrame(base64: string, mimeType: string): Promise<boolean[]> {
+export async function hashFrame(
+	base64: string,
+	mimeType: string,
+): Promise<{ structure: boolean[]; colour: number[] }> {
 	const bitmap = await createImageBitmap(
 		await (await fetch(`data:${mimeType};base64,${base64}`)).blob(),
 	);
@@ -168,7 +268,10 @@ export async function hashFrame(base64: string, mimeType: string): Promise<boole
 		if (!context) throw new Error("This browser gave no 2d context to hash with.");
 		context.drawImage(bitmap, 0, 0);
 		const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
-		return dHash(reduce(data, bitmap.width, bitmap.height));
+		return {
+			structure: dHash(reduce(data, bitmap.width, bitmap.height)),
+			colour: colourSignature(data, bitmap.width, bitmap.height),
+		};
 	} finally {
 		// A bitmap that is not closed holds its decoded pixels until GC gets
 		// round to it, and a fifteen-shot cut decodes fifteen of them.

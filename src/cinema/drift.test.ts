@@ -8,7 +8,17 @@
 
 import { describe, expect, it } from "vitest";
 
-import { dHash, distance, driftAcross, HASH_BITS, medianHash, reduce } from "./drift";
+import {
+	colourDistance,
+	colourSignature,
+	dHash,
+	distance,
+	driftAcross,
+	HASH_BITS,
+	medianColour,
+	medianHash,
+	reduce,
+} from "./drift";
 
 /** An RGBA buffer painted by a function of x and y. */
 function frame(
@@ -171,5 +181,62 @@ describe("driftAcross", () => {
 describe("distance", () => {
 	it("refuses to compare hashes of different lengths", () => {
 		expect(() => distance([true], [true, false])).toThrow(/different lengths/i);
+	});
+});
+
+describe("colour signature", () => {
+	const flat = (r: number, g: number, b: number) => frame(90, 80, () => [r, g, b]);
+
+	it("sees a grade shift that the structure hash is blind to", () => {
+		// This is the failure that made the second signature necessary. Five stub
+		// frames — visibly teal, blue and slate — all hashed identical, because
+		// a difference hash is robust to colour on purpose. It reported "nothing
+		// has wandered" about frames anyone can see are different colours.
+		const teal = colourSignature(flat(20, 160, 150), 90, 80);
+		const slate = colourSignature(flat(70, 80, 110), 90, 80);
+		expect(colourDistance(teal, slate)).toBeGreaterThan(0.15);
+
+		const structureTeal = dHash(reduce(flat(20, 160, 150), 90, 80));
+		const structureSlate = dHash(reduce(flat(70, 80, 110), 90, 80));
+		expect(distance(structureTeal, structureSlate)).toBe(0);
+	});
+
+	it("calls identical colours identical", () => {
+		const once = colourSignature(flat(90, 90, 90), 90, 80);
+		const twice = colourSignature(flat(90, 90, 90), 90, 80);
+		expect(colourDistance(once, twice)).toBe(0);
+	});
+
+	it("takes the per-channel middle", () => {
+		expect(
+			medianColour([
+				[10, 0, 0],
+				[20, 0, 0],
+				[90, 0, 0],
+			])[0],
+		).toBe(20);
+	});
+
+	it("refuses an image smaller than the colour grid", () => {
+		expect(() => colourSignature(new Uint8ClampedArray(4), 1, 1)).toThrow(/colour grid/i);
+	});
+
+	it("names the grade when a shot is only graded differently", () => {
+		const same = dHash(reduce(flat(90, 90, 90), 90, 80));
+		const hashes = [same, same, same, same, same];
+		const usual = colourSignature(flat(90, 90, 90), 90, 80);
+		const odd = colourSignature(flat(20, 200, 60), 90, 80);
+		const drift = driftAcross(hashes, [usual, usual, odd, usual, usual]);
+		expect(drift[2].outlier).toBe(true);
+		expect(drift[2].because).toBe("grade");
+		expect(drift[0].because).toBeNull();
+	});
+
+	it("still works with no colour data at all", () => {
+		// The structure-only call has to keep meaning what it meant.
+		const same = dHash(reduce(flat(90, 90, 90), 90, 80));
+		const drift = driftAcross([same, same, same]);
+		expect(drift.every((shot) => shot.palette === 0)).toBe(true);
+		expect(drift.every((shot) => !shot.outlier)).toBe(true);
 	});
 });
