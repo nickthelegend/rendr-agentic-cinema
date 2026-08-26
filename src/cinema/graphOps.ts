@@ -333,3 +333,38 @@ export const PALETTE_GROUPS = (): Array<{ group: string; kinds: CinemaNodeKind[]
 	}
 	return [...groups.entries()].map(([group, kinds]) => ({ group, kinds }));
 };
+
+/**
+ * Adds one node of a kind, near the middle of what is already there.
+ *
+ * Placed relative to the existing graph rather than at the origin, because a
+ * node created off-screen reads as a click that did nothing — which is how the
+ * empty-state cards would feel on a canvas that had been panned.
+ */
+export function addNode(graph: CinemaGraph, kind: CinemaNodeKind): CinemaGraph {
+	const xs = graph.nodes.map((node) => node.x);
+	const ys = graph.nodes.map((node) => node.y);
+	const x = xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) + 120 : 0;
+	const y = ys.length ? Math.round(ys.reduce((a, b) => a + b, 0) / ys.length) : 0;
+
+	return {
+		...graph,
+		nodes: [
+			...graph.nodes,
+			{
+				id: freshId(graph, kind),
+				kind,
+				x,
+				y,
+				params:
+					kind === "scene"
+						? {
+								sceneIndex: graph.nodes.filter((n) => n.kind === "scene").length,
+								aspect: "16:9",
+							}
+						: {},
+				status: "idle",
+			},
+		],
+	};
+}

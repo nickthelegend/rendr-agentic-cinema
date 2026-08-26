@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { exportFilm, importFilm } from "../cinema/deliver";
 import { TEMPLATES } from "../cinema/graphOps";
-import { starterGraph } from "../cinema/persist";
+import { emptyGraph } from "../cinema/persist";
 import { can } from "../config/capabilities";
 import { toFcpxml, toXmeml } from "./interchange";
 import { splitAt } from "./reducers";
@@ -94,10 +94,13 @@ export function MenuBar({
 							label: "Name",
 							initialValue: "Untitled film",
 							confirmLabel: "Create",
-							// Seeded rather than empty: an empty canvas teaches
-							// nothing about what the nodes do, and every film needs
-							// these three to produce anything at all.
-							onConfirm: (name) => api.addCinemaGraph(starterGraph(name)),
+							// Empty, and that is the point now. The canvas's own
+							// empty state offers the four ways in — a story, a
+							// character, a first frame, a world — which teaches the
+							// node kinds better than a pre-wired graph does, and the
+							// four templates below cover anyone who wants a running
+							// start.
+							onConfirm: (name) => api.addCinemaGraph(emptyGraph(name)),
 						}),
 				},
 				// One item per template rather than a submenu. The menu has no

@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	addNode,
 	autoLayout,
 	duplicateNode,
 	findNodes,
@@ -312,5 +313,36 @@ describe("PALETTE_GROUPS", () => {
 		expect(new Set(kinds).size).toBe(kinds.length);
 		expect(kinds).toContain("character");
 		expect(kinds).toContain("timeline");
+	});
+});
+
+describe("addNode", () => {
+	it("adds one node of the kind asked for", () => {
+		const out = addNode(graph([]), "character");
+		expect(out.nodes).toHaveLength(1);
+		expect(out.nodes[0].kind).toBe("character");
+		expect(out.nodes[0].status).toBe("idle");
+	});
+
+	it("places it near what is already there, not at the origin", () => {
+		// A node created off-screen reads as a click that did nothing.
+		const far = graph([node("a", "beat", { x: 900, y: 400 })]);
+		const out = addNode(far, "story");
+		const added = out.nodes[1];
+		expect(added.x).toBeGreaterThan(800);
+		expect(added.y).toBe(400);
+	});
+
+	it("gives each new scene the next shot index", () => {
+		let out = graph([]);
+		out = addNode(out, "scene");
+		out = addNode(out, "scene");
+		expect(out.nodes.map((n) => n.params.sceneIndex)).toEqual([0, 1]);
+	});
+
+	it("never collides with an existing id", () => {
+		let out = graph([]);
+		for (let i = 0; i < 6; i++) out = addNode(out, "beat");
+		expect(new Set(out.nodes.map((n) => n.id)).size).toBe(6);
 	});
 });

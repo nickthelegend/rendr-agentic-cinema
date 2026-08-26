@@ -956,9 +956,7 @@ export function EditorShell() {
 			// graph produces footage, a workflow edits it, a timeline cuts it.
 			// The timeline is the fallback because it is the only one that is
 			// always meaningful.
-			state.activeCinemaGraphId ? (
-				<CinemaPanel api={api} />
-			) : state.activeWorkflowId ? (
+			state.activeWorkflowId ? (
 				<WorkflowPanel api={api} />
 			) : (
 				<TimelinePanel api={api} onImportClick={openImport} />
@@ -970,7 +968,26 @@ export function EditorShell() {
 	};
 
 	let presetLayout: React.ReactNode;
-	if (state.layoutPreset === "default") {
+	// A film takes the whole window. The graph is a full-bleed surface — pushed
+	// into a third of the height it cannot be read, let alone arranged.
+	if (state.activeCinemaGraphId) {
+		presetLayout = (
+			<CinemaPanel
+				api={api}
+				menu={
+					<MenuBar
+						api={api}
+						onImportClick={openImport}
+						onRecordClick={openRecord}
+						onExportClick={() => setExporting(true)}
+						onOpenClick={openProjectFile}
+						onExportFrame={() => void exportFrame()}
+						onProjectSettings={() => setSettingsOpen(true)}
+					/>
+				}
+			/>
+		);
+	} else if (state.layoutPreset === "default") {
 		presetLayout = (
 			<Split
 				direction="vertical"
@@ -1067,6 +1084,9 @@ export function EditorShell() {
 		<div
 			className="pmr"
 			// The timeline's header width lives in one place; CSS reads it from here.
+			// A film hides the editor's own title bar: the cinema shell carries the
+			// menus itself, and two bars is one more than the canvas can spare.
+			data-cinema={state.activeCinemaGraphId ? "" : undefined}
 			style={{ "--pmr-track-header": `${Layout.trackHeaderWidth}px` } as React.CSSProperties}
 		>
 			<input

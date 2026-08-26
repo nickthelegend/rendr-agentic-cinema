@@ -24,6 +24,7 @@ import {
 	ReactFlowProvider,
 	useEdgesState,
 	useNodesState,
+	useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -151,6 +152,7 @@ export function CinemaCanvas(props: CinemaCanvasProps) {
 }
 
 function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
+	const flow = useReactFlow();
 	const issues = useMemo(() => graphIssues(graph), [graph]);
 	const issueFor = useCallback(
 		(id: string) => issues.find((entry) => entry.nodeId === id)?.message,
@@ -178,6 +180,16 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 		})),
 	);
 	const [dropKind, setDropKind] = useState<CinemaNodeKind | null>(null);
+	/**
+	 * Where a double-click asked for a node.
+	 *
+	 * The empty state tells people to double-click the canvas, so the canvas has
+	 * to answer. Copy that promises a gesture the app does not implement is
+	 * worse than no copy — it teaches that the instructions here are decorative.
+	 */
+	const [picker, setPicker] = useState<{ sx: number; sy: number; fx: number; fy: number } | null>(
+		null,
+	);
 
 	/**
 	 * Pull React Flow back in line when the graph changed from outside.
@@ -304,7 +316,51 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 	const groups = useMemo(() => ["ingredient", "identity", "story", "output"] as const, []);
 
 	return (
-		<div className="cin">
+		<div
+			className="cin"
+			// The wrapper, not <ReactFlow>: React Flow does not forward arbitrary
+			// DOM props to its root, so a handler passed to it silently never
+			// fires — which is how the empty state ended up promising a gesture
+			// that did nothing.
+			onDoubleClick={(event) => {
+				// Only the empty pane. A double-click on a node opens it.
+				const target = event.target as HTMLElement;
+				if (!target.classList.contains("react-flow__pane")) return;
+				const box = event.currentTarget.getBoundingClientRect();
+				const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+				setPicker({
+					sx: event.clientX - box.left,
+					sy: event.clientY - box.top,
+					fx: at.x,
+					fy: at.y,
+				});
+			}}
+		>
+			{picker ? (
+				<div
+					className="cin__picker"
+					style={{ left: picker.sx, top: picker.sy }}
+					role="menu"
+					aria-label="Add a node here"
+				>
+					{NODE_SPECS.map((spec) => (
+						<button
+							key={spec.kind}
+							type="button"
+							role="menuitem"
+							style={{ "--tint": GROUP_TINT[spec.group] } as React.CSSProperties}
+							onClick={() => {
+								addNode(spec.kind, { x: picker.fx, y: picker.fy });
+								setPicker(null);
+							}}
+						>
+							{spec.label}
+							{spec.generative ? <span className="cin__spark">◆</span> : null}
+						</button>
+					))}
+				</div>
+			) : null}
+
 			<aside className="cin__palette">
 				{groups.map((group) => (
 					<section key={group} className="cin__group">
@@ -362,7 +418,10 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 					// way back to the empty inspector once anything was picked,
 					// which quietly made the whole overview it shows — the prompt
 					// leaderboard and the running spend — unreachable.
-					onPaneClick={() => onOpenNode(null)}
+					onPaneClick={() => {
+						onOpenNode(null);
+						setPicker(null);
+					}}
 					onConnect={onConnect}
 					onEdgesDelete={(gone) =>
 						onChange({
@@ -376,6 +435,11 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 						if (event.key === "Backspace" || event.key === "Delete") removeSelected();
 					}}
 					fitView
+					// Double-click belongs to "add a node here", which is what the
+					// empty state tells people to do. Left on, d3-zoom swallows the
+					// event to zoom the pane and the gesture never reaches React at
+					// all — the handler looked wired and could not fire.
+					zoomOnDoubleClick={false}
 					proOptions={{ hideAttribution: false }}
 					defaultEdgeOptions={{ animated: true }}
 				>

@@ -5,19 +5,20 @@
 // drawing is in CinemaCanvas.tsx, and this is the seam between them and the
 // editor's state.
 
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withDefaults } from "../palmier-ui/model";
 import { PanelHeader } from "../palmier-ui/Panel";
 import type { EditorApi } from "../palmier-ui/state";
-import { AUTO_DEBOUNCE_MS, confirmMessage, decideAuto } from "./auto";
+import { AUTO_DEBOUNCE_MS, confirmMessage, DEFAULT_CALL_CEILING, decideAuto } from "./auto";
 import { CinemaCanvas } from "./CinemaCanvas";
 import { CinemaInspector } from "./CinemaInspector";
+import { CinemaShell } from "./CinemaShell";
 import { CHECK_MODELS, type CheckResult, checkConnection } from "./checkConnection";
 import { readyScenes } from "./commit";
-import { shotListCsv } from "./deliver";
-import { autoLayout, preflight } from "./graphOps";
+import { exportFilm, shotListCsv } from "./deliver";
+import { addNode, autoLayout, preflight } from "./graphOps";
 import { createClickhouseLedger, type Ledger } from "./ledger";
-import { graphIssues } from "./nodes";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, needsRun, runGraph } from "./run";
@@ -41,7 +42,7 @@ function download(name: string, type: string, body: string): void {
 	URL.revokeObjectURL(url);
 }
 
-export function CinemaPanel({ api }: { api: EditorApi }) {
+export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactNode }) {
 	const { state, toast } = api;
 	const graph = state.cinemaGraphs.find((entry) => entry.id === state.activeCinemaGraphId);
 
@@ -49,6 +50,10 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 	const [checks, setChecks] = useState<CheckResult[] | null>(null);
 	const ledger = useRef<Ledger | null>(null);
 	const [checking, setChecking] = useState(false);
+	// What this film has spent, for the budget the shell shows. Refreshed after
+	// every run rather than polled: nothing else moves it.
+	const [spent, setSpent] = useState(0);
+	const [showMap, setShowMap] = useState(false);
 	const notice = useCallback(
 		(message: string, tone?: "error" | "info") =>
 			toast(message, tone === "error" ? "error" : undefined),
@@ -288,8 +293,6 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 		api.setActiveCinemaGraph(null);
 	}, [api, graph, notice]);
 
-	const issues = graphIssues(graph);
-	const ready = issues.length === 0 && graph.nodes.length > 0;
 	const pending = estimateRun(graph);
 	const placeable = readyScenes(graph).length;
 
@@ -400,10 +403,31 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 				);
 			} finally {
 				setRunning(false);
+				// The budget in the shell is only meaningful if it moves. Read it
+				// back after the run rather than counting locally, so a manual
+				// render and an automatic one agree.
+				void ledger.current
+					?.spentOn(graph.id)
+					.then((total) => setSpent(total.calls))
+					.catch(() => {});
 			}
 		},
 		[api, graph, notice, running],
 	);
+
+	// Once when the film opens, so the budget is right before anything is run.
+	useEffect(() => {
+		let live = true;
+		void ledger.current
+			?.spentOn(graph.id)
+			.then((total) => {
+				if (live) setSpent(total.calls);
+			})
+			.catch(() => {});
+		return () => {
+			live = false;
+		};
+	}, [graph.id]);
 
 	/**
 	 * Auto mode.
@@ -459,162 +483,130 @@ export function CinemaPanel({ api }: { api: EditorApi }) {
 
 	return (
 		<>
-			<PanelHeader title={`Cinema · ${graph.name}`}>
-				<span className="pmr-wf__state" data-ready={ready || undefined}>
-					{ready ? "ready to render" : `${issues.length} to fix`}
-				</span>
-				<button
-					type="button"
-					className="pmr-button"
-					title="Auto mode: a story edit re-decomposes and re-renders everything downstream."
-					onClick={() => api.updateCinemaGraph({ ...graph, auto: !graph.auto })}
-				>
-					{graph.auto ? "Auto: on" : "Auto: off"}
-				</button>
-				<button
-					type="button"
-					className="pmr-button"
-					disabled={state.cinemaUndo.length === 0}
-					title="Undo the last change to the graph (⌘Z)"
-					onClick={api.undoCinema}
-				>
-					Undo
-				</button>
-				<button
-					type="button"
-					className="pmr-button"
-					disabled={checking}
-					title={`Check the key and the request shape against ${CHECK_MODELS()}`}
-					onClick={testConnection}
-				>
-					{checking ? "Checking…" : "Test connection"}
-				</button>
-				<button
-					type="button"
-					className="pmr-button"
-					disabled={placeable === 0}
-					title={
-						placeable === 0
-							? "Render some scenes first."
-							: `Place ${placeable} scene(s)`
-					}
-					onClick={commitToCut}
-				>
-					{placeable ? `To timeline (${placeable})` : "To timeline"}
-				</button>
-				<button
-					type="button"
-					className="pmr-button"
-					title="Lay the graph out in the order it runs."
-					onClick={() => api.updateCinemaGraph(autoLayout(graph))}
-				>
-					Tidy
-				</button>
-				<button
-					type="button"
-					className="pmr-button"
-					disabled={shots.length === 0}
-					title={
-						shots.length
-							? "Download the shot list as a spreadsheet."
-							: "Decompose the story first."
-					}
-					onClick={() => {
-						download(
-							`${graph.name || "film"} shot list.csv`,
-							"text/csv",
-							shotListCsv(graph, shots, api.timeline.fps),
-						);
-					}}
-				>
-					Shot list
-				</button>
-				<button
-					type="button"
-					className="pmr-button pmr-button--primary"
-					disabled={running || pending === 0}
-					// The cost is on the button rather than behind it. A control that
-					// spends money should say how much before it is pressed, not
-					// after — and this is the one number everybody wants.
-					title={
-						pending === 0
-							? "Everything is up to date."
-							: `${cost.summary}. ${problems.length ? `${problems.length} problem(s) to fix first.` : ""}`
-					}
-					onClick={() => run()}
-				>
-					{running
-						? "Rendering…"
-						: pending
-							? `Render ${pending} · ~$${cost.usd?.toFixed(2)}`
-							: "Up to date"}
-				</button>
-			</PanelHeader>
-
-			{/* Notes about the film, before anything is rendered. Preflight is
-			    what stops a run; the cut notes are advice and never do. Both are
-			    free — the expensive part is the render, so every judgement that
-			    can happen first should. */}
-			{problems.length > 0 || notes.length > 0 ? (
-				<div className="cin-notes">
-					{problems.map((line) => (
-						<p key={line} className="cin-notes__stop">
-							{line}
-						</p>
-					))}
-					{notes.map((note) => (
-						<p key={note.message} className="cin-notes__note">
-							<em>{note.kind}</em>
-							{note.sceneIndex !== undefined ? ` shot ${note.sceneIndex + 1}: ` : " "}
-							{note.message}
-						</p>
-					))}
-				</div>
-			) : null}
-
-			{checks ? (
-				<div className="cin-checks">
-					<div className="cin-checks__head">
-						<strong>Connection</strong>
-						<span>{CHECK_MODELS()}</span>
-						<button
-							type="button"
-							className="pmr-button"
-							onClick={() => setChecks(null)}
-						>
-							Close
-						</button>
-					</div>
-					{checks.map((check) => (
-						<p
-							key={check.name}
-							className="cin-checks__row"
-							data-ok={check.ok || undefined}
-						>
-							<span>{check.ok ? "✓" : "✕"}</span>
-							<strong>{check.name}</strong>
-							<em>{check.detail}</em>
-						</p>
-					))}
-				</div>
-			) : null}
-
-			<div className="cin-shell">
+			<CinemaShell
+				menu={menu}
+				filmName={graph.name}
+				view="canvas"
+				// The timeline is the editor, not another tab of this canvas — so the
+				// view switch hands the window back rather than swapping a pane.
+				onView={(next) => {
+					if (next === "timeline") api.setActiveCinemaGraph(null);
+				}}
+				empty={graph.nodes.length === 0}
+				onCreate={(kind) => api.updateCinemaGraph(addNode(graph, kind))}
+				onTemplates={() => api.setActiveCinemaGraph(null)}
+				onUpload={() => api.updateCinemaGraph(addNode(graph, "reference"))}
+				running={running}
+				pending={pending}
+				costUsd={cost.usd}
+				onRender={() => run()}
+				callsLeft={Math.max(0, DEFAULT_CALL_CEILING - spent)}
+				auto={graph.auto}
+				onAuto={() => api.updateCinemaGraph({ ...graph, auto: !graph.auto })}
+				problems={problems.length}
+				notes={notes.length}
+				canUndo={state.cinemaUndo.length > 0}
+				onUndo={api.undoCinema}
+				onTidy={() => api.updateCinemaGraph(autoLayout(graph))}
+				onShotList={() =>
+					shots.length
+						? download(
+								`${graph.name || "film"} shot list.csv`,
+								"text/csv",
+								shotListCsv(graph, shots, api.timeline.fps),
+							)
+						: notice("Decompose the story first — there are no shots yet.", "error")
+				}
+				onToTimeline={commitToCut}
+				placeable={placeable}
+				onTestConnection={testConnection}
+				onExport={() =>
+					download(
+						`${graph.name || "film"}.film.json`,
+						"application/json",
+						exportFilm(graph),
+					)
+				}
+				onAssets={() => api.setActiveCinemaGraph(null)}
+				showMap={showMap}
+				onToggleMap={() => setShowMap((on) => !on)}
+				onAddNode={() => api.updateCinemaGraph(addNode(graph, "beat"))}
+				onAgent={() => api.patch({ agentPanelVisible: !state.agentPanelVisible })}
+				onShortcuts={() =>
+					notice("⌘Z undoes the graph. Double-click the canvas to add a node.")
+				}
+				onHistory={() => notice(`${spent} model call(s) recorded for this film.`)}
+				language="EN"
+				onLanguage={() => notice("This build ships English only.")}
+				aside={
+					graph.nodes.length === 0 ? null : (
+						<CinemaInspector
+							graph={graph}
+							nodeId={state.selectedCinemaNodeId}
+							ledger={ledger.current}
+							onChange={api.updateCinemaGraph}
+							onRun={(nodeId) => run([nodeId])}
+							onNotice={notice}
+						/>
+					)
+				}
+			>
 				<CinemaCanvas
 					graph={graph}
 					onChange={api.updateCinemaGraph}
 					onOpenNode={api.selectCinemaNode}
 					onNotice={notice}
 				/>
-				<CinemaInspector
-					graph={graph}
-					nodeId={state.selectedCinemaNodeId}
-					ledger={ledger.current}
-					onChange={api.updateCinemaGraph}
-					onRun={(nodeId) => run([nodeId])}
-					onNotice={notice}
-				/>
-			</div>
+
+				{/* Notes about the film, before anything is rendered. Preflight is
+				    what stops a run; the cut notes are advice and never do. Both are
+				    free — the expensive part is the render. */}
+				{graph.nodes.length > 0 && (problems.length > 0 || notes.length > 0) ? (
+					<div className="cin-notes cin-notes--float">
+						{problems.map((line) => (
+							<p key={line} className="cin-notes__stop">
+								{line}
+							</p>
+						))}
+						{notes.map((note) => (
+							<p key={note.message} className="cin-notes__note">
+								<em>{note.kind}</em>
+								{note.sceneIndex !== undefined
+									? ` shot ${note.sceneIndex + 1}: `
+									: " "}
+								{note.message}
+							</p>
+						))}
+					</div>
+				) : null}
+
+				{checks ? (
+					<div className="cin-checks cin-checks--float">
+						<div className="cin-checks__head">
+							<strong>Connection</strong>
+							<span>{CHECK_MODELS()}</span>
+							<button
+								type="button"
+								className="pmr-button"
+								onClick={() => setChecks(null)}
+							>
+								Close
+							</button>
+						</div>
+						{checks.map((check) => (
+							<p
+								key={check.name}
+								className="cin-checks__row"
+								data-ok={check.ok || undefined}
+							>
+								<span>{check.ok ? "✓" : "✕"}</span>
+								<strong>{check.name}</strong>
+								<em>{check.detail}</em>
+							</p>
+						))}
+					</div>
+				) : null}
+			</CinemaShell>
 		</>
 	);
 }
