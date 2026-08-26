@@ -1332,3 +1332,18 @@
 .cshell__burn[data-low] i {
 	background: #e0556a;
 }
+
+/* What a step cost, on the card. */
+.cshell .cin-node__meter {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 4px 0 0;
+	font-size: 9.5px;
+	font-variant-numeric: tabular-nums;
+	color: var(--ink-faint);
+}
+.cshell .cin-node__meter em {
+	font-style: normal;
+	opacity: 0.75;
+}

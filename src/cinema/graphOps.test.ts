@@ -19,6 +19,7 @@ import {
 	withDownstream,
 } from "./graphOps";
 import type { CinemaGraph, CinemaNode } from "./nodes";
+import { connectionError } from "./nodes";
 
 const node = (
 	id: string,
@@ -344,5 +345,78 @@ describe("addNode", () => {
 		let out = graph([]);
 		for (let i = 0; i < 6; i++) out = addNode(out, "beat");
 		expect(new Set(out.nodes.map((n) => n.id)).size).toBe(6);
+	});
+});
+
+describe("auto-wiring a new node", () => {
+	// A node added from the palette used to land unwired, which trips preflight
+	// and leaves the user hunting the right port among fifteen boxes.
+	const wired = () =>
+		graph(
+			[
+				node("st", "story", { text: "a premise" }),
+				node("tl", "timeline"),
+				node("ch", "character", { text: "a lead" }),
+			],
+			[["ch", "st"]],
+		);
+
+	it("hangs a character off the story", () => {
+		const out = addNode(wired(), "character");
+		const added = out.nodes[out.nodes.length - 1];
+		expect(out.edges.some((e) => e.from === added.id && e.to === "st")).toBe(true);
+	});
+
+	it("puts a scene between the story and the timeline", () => {
+		const out = addNode(wired(), "scene");
+		const added = out.nodes[out.nodes.length - 1];
+		expect(out.edges.some((e) => e.from === "st" && e.to === added.id)).toBe(true);
+		expect(out.edges.some((e) => e.from === added.id && e.to === "tl")).toBe(true);
+	});
+
+	it("hangs an ingredient off a character", () => {
+		const out = addNode(wired(), "trait");
+		const added = out.nodes[out.nodes.length - 1];
+		expect(out.edges.some((e) => e.from === added.id && e.to === "ch")).toBe(true);
+	});
+
+	it("wires nothing when there is no sensible partner", () => {
+		// Inventing one would be worse than leaving it loose.
+		const alone = graph([]);
+		expect(addNode(alone, "scene").edges).toEqual([]);
+	});
+
+	it("never creates an edge the rules would refuse", () => {
+		for (const kind of [
+			"reference",
+			"trait",
+			"look",
+			"voice",
+			"character",
+			"world",
+			"beat",
+			"scene",
+			"timeline",
+		] as const) {
+			const out = addNode(wired(), kind);
+			for (const edge of out.edges) {
+				expect(
+					connectionError(
+						{ ...out, edges: out.edges.filter((e) => e.id !== edge.id) },
+						edge.from,
+						edge.to,
+					),
+					`${kind}: ${edge.from} -> ${edge.to}`,
+				).toBeFalsy();
+			}
+		}
+	});
+
+	it("leaves a template's own wiring alone", () => {
+		// Templates arrive wired; adding to one must not double an edge.
+		const built = TEMPLATES[0].build("g9", "T");
+		const before = built.edges.length;
+		const out = addNode(built, "beat");
+		expect(out.edges.length).toBe(before + 1);
 	});
 });

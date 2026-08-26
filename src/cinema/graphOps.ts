@@ -11,6 +11,7 @@ import {
 	type CinemaGraph,
 	type CinemaNode,
 	type CinemaNodeKind,
+	connectionError,
 	descendants,
 	inputsOf,
 	NODE_SPECS,
@@ -341,18 +342,61 @@ export const PALETTE_GROUPS = (): Array<{ group: string; kinds: CinemaNodeKind[]
  * node created off-screen reads as a click that did nothing — which is how the
  * empty-state cards would feel on a canvas that had been panned.
  */
+/**
+ * The node a new one of this kind should attach to, and which way round.
+ *
+ * A node added from the palette used to land unwired, which trips preflight and
+ * leaves the user to find the right port among fifteen boxes. The graph almost
+ * always knows the answer: an ingredient belongs to a character, a character
+ * and a world and a beat belong to the story, a scene comes off the story and
+ * feeds the timeline. Guessing that is worth far more than the rare case where
+ * the guess is wrong and one wire has to be moved.
+ *
+ * Returns nothing when there is no sensible partner, rather than inventing one.
+ */
+export function autoWire(
+	graph: CinemaGraph,
+	kind: CinemaNodeKind,
+): Array<{ from: CinemaNodeKind; to: "new" } | { from: "new"; to: CinemaNodeKind }> {
+	const has = (want: CinemaNodeKind) => graph.nodes.some((node) => node.kind === want);
+	switch (kind) {
+		case "reference":
+		case "trait":
+		case "look":
+		case "voice":
+			return has("character") ? [{ from: "new", to: "character" }] : [];
+		case "character":
+		case "world":
+		case "beat":
+			return has("story") ? [{ from: "new", to: "story" }] : [];
+		case "scene": {
+			const wires: Array<
+				{ from: CinemaNodeKind; to: "new" } | { from: "new"; to: CinemaNodeKind }
+			> = [];
+			if (has("story")) wires.push({ from: "story", to: "new" });
+			if (has("timeline")) wires.push({ from: "new", to: "timeline" });
+			return wires;
+		}
+		case "timeline":
+			return has("scene") ? [{ from: "scene", to: "new" }] : [];
+		default:
+			return [];
+	}
+}
+
 export function addNode(graph: CinemaGraph, kind: CinemaNodeKind): CinemaGraph {
 	const xs = graph.nodes.map((node) => node.x);
 	const ys = graph.nodes.map((node) => node.y);
 	const x = xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) + 120 : 0;
 	const y = ys.length ? Math.round(ys.reduce((a, b) => a + b, 0) / ys.length) : 0;
 
-	return {
+	const id = freshId(graph, kind);
+	const withNode: CinemaGraph = {
 		...graph,
 		nodes: [
 			...graph.nodes,
 			{
-				id: freshId(graph, kind),
+				id,
 				kind,
 				x,
 				y,
@@ -367,4 +411,19 @@ export function addNode(graph: CinemaGraph, kind: CinemaNodeKind): CinemaGraph {
 			},
 		],
 	};
+
+	// Attached where the graph says it belongs. Only edges the rules allow are
+	// kept, so a guess can never produce a connection the canvas would refuse.
+	const pick = (want: CinemaNodeKind) =>
+		[...graph.nodes].reverse().find((node) => node.kind === want)?.id;
+	const edges = [...withNode.edges];
+	for (const wire of autoWire(graph, kind)) {
+		const other = pick(wire.from === "new" ? (wire.to as CinemaNodeKind) : wire.from);
+		if (!other) continue;
+		const from = wire.from === "new" ? id : other;
+		const to = wire.from === "new" ? other : id;
+		if (connectionError({ ...withNode, edges }, from, to)) continue;
+		edges.push({ id: `${id}-auto${edges.length}`, from, to });
+	}
+	return { ...withNode, edges };
 }

@@ -29,6 +29,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { addNode as addGraphNode } from "./graphOps";
 import {
 	type CinemaGraph,
 	type CinemaNode,
@@ -120,6 +121,22 @@ function CinemaNodeCard({ data, selected }: NodeProps & { data: CinemaNodeData }
 					{node.label ?? node.text?.slice(0, 90) ?? <em>empty</em>}
 				</p>
 			</div>
+
+			{/* What this step actually took. A graph that shows its own cost is
+			    the difference between "it rendered" and "it rendered in five
+			    seconds for four cents" — and the character node being five times
+			    slower than a scene is a real fact about the pipeline that is
+			    invisible without it. */}
+			{node.output?.elapsedMs ? (
+				<p className="cin-node__meter">
+					<span>
+						{node.output.elapsedMs >= 1000
+							? `${(node.output.elapsedMs / 1000).toFixed(1)}s`
+							: `${node.output.elapsedMs}ms`}
+					</span>
+					{node.output.seed !== undefined ? <em>seed {node.output.seed}</em> : null}
+				</p>
+			) : null}
 
 			{issue ? <p className="cin-node__issue">{issue}</p> : null}
 			{node.error ? <p className="cin-node__error">{node.error}</p> : null}
@@ -275,30 +292,33 @@ function Canvas({ graph, onChange, onOpenNode, onNotice, tool = "select" }: Cine
 		[graph, onChange, onNotice, setEdges],
 	);
 
+	/**
+	 * Adds a node where it was asked for, wired where it belongs.
+	 *
+	 * Delegates the graph change to graphOps.addNode rather than building a node
+	 * here. There used to be two functions with this name — one in graphOps that
+	 * auto-wires and one here that did not — so a node created from the palette
+	 * landed loose while the same kind created from the starter cards came in
+	 * connected. Two code paths for one action is how a feature ends up half
+	 * true.
+	 */
 	const addNode = useCallback(
 		(kind: CinemaNodeKind, at?: { x: number; y: number }) => {
-			const count = graph.nodes.length;
-			const node: CinemaNode = {
-				id: `n-${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-				kind,
-				x: at?.x ?? 80 + (count % 4) * 240,
-				y: at?.y ?? 80 + Math.floor(count / 4) * 170,
-				params: {},
-				status: "idle",
-			};
-			const next = { ...graph, nodes: [...graph.nodes, node] };
-			onChange(next);
-			setNodes((current) => [
-				...current,
-				{
-					id: node.id,
-					type: "cinema",
-					position: { x: node.x, y: node.y },
-					data: { node, issue: undefined, onOpen: onOpenNode },
-				},
-			]);
+			const next = addGraphNode(graph, kind);
+			const added = next.nodes[next.nodes.length - 1];
+			// graphOps places relative to the existing graph; a drop or a
+			// double-click knows better and says where.
+			const placed = at
+				? {
+						...next,
+						nodes: next.nodes.map((node) =>
+							node.id === added.id ? { ...node, x: at.x, y: at.y } : node,
+						),
+					}
+				: next;
+			onChange(placed);
 		},
-		[graph, onChange, onOpenNode, setNodes],
+		[graph, onChange],
 	);
 
 	const removeSelected = useCallback(() => {
