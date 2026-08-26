@@ -1,1 +1,2 @@
-# Nothing here is ignored: the built site is the payload.
+# Nothing here is ignored. The built site under public/ IS the payload, and an
+# ignore rule that hides it produces a healthy server with nothing to serve.

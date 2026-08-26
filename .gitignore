@@ -59,5 +59,10 @@ vendor/walletchan/
 
 preflight-out/
 
-# The built payload for the hosted deploy. Rebuilt by scripts/deploy-web.mjs.
-deploy/public/
+# The built payload for the hosted deploy is NOT ignored.
+#
+# It was, and Railway honours ignore files when it builds the upload — so the
+# site was left out of the deployment and every request 502'd while the server
+# itself was healthy. This is the second time an ignore rule has silently
+# emptied a deploy; the payload stays visible now, and `npm run build:web`
+# rewrites it.
