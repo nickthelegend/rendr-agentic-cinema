@@ -143,7 +143,39 @@ real today with no credential at all:
 
 ---
 
+## What actually shipped
+
+Built, deployed and verified in a browser against the live URL — not "compiles":
+
+| # | Idea | Evidence |
+|---|---|---|
+| 1 | The film speaks | Kokoro generates in-tab; the clip lands on A1 with a waveform, under the shot its line belongs to |
+| 2 | On-chain provenance | Stellar testnet tx `87e4cecb…`, ledger 4346744, signed by `GDABZEZ3…` |
+| 3 | Verify tab | Re-reads from Horizon, recomputes locally: "The chain holds this exact cut" |
+| 4 | Drift measurement | Framing (64-bit dHash) and grade (4×4 colour) as separate numbers — caught shot 3 at 19% grade drift |
+| 6 | Live SQL against Clickhouse | Four presets, real rows, and a `DROP` that comes back refused by the proxy |
+| 7 | Shareable film link | 981 characters; a cold tab opens straight into the film |
+
+Two things fell out of building them, both real bugs that had been invisible:
+
+- **The spend column was never written.** `cost_usd` was in the schema from the
+  start, `spentOn` queried it, the auto-mode ceiling depended on it, and nothing
+  ever wrote a value. The SQL console found it in its first minute.
+- **`placeAsset` silently no-ops on a fresh import**, because it resolves the
+  asset out of a closure from the render *before* the import. The picture path
+  had been quietly working around it by building its clips twice.
+
 ## Not built, and why
 
-Kept honest rather than quietly dropped — see the final section of the report
-for what actually shipped.
+Everything from #5 and #8 down. The honest reason is time rather than judgement
+— they were ranked in the order they are because that is the order they are
+worth, and the run stopped partway down. Two exceptions worth naming:
+
+**#10, the provenance badge on every clip**, is genuinely blocked rather than
+skipped: a timeline clip has no field to carry a notarisation, so it needs a
+schema change to the editor's clip model, which is a wider change than it looks.
+
+**#8's deeper half — clause attribution** — turned out to be mostly subsumed by
+the SQL console. A judge can write that query themselves now, and a pre-baked
+panel answering one phrasing of it would be less convincing than the box that
+answers any.
