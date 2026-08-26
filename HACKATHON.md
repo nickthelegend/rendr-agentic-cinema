@@ -32,7 +32,7 @@ of the idea.
 ## Why this codebase is a head start
 
 The brief is a media and entertainment workflow driven by an agent. That is
-already what this is: 101 MCP tools over a real recorder and editor, with
+already what this is: 102 MCP tools over a real recorder and editor, with
 narration, captions, zoom and export all driven by tool calls rather than by
 hand. The agent surface exists; what changes is which model sits behind it and
 what the workflow is for.
