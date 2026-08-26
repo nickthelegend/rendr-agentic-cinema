@@ -1545,3 +1545,61 @@
 		transition: none;
 	}
 }
+
+/* ── Ask it yourself ─────────────────────────────────────────────────────────
+ * The SQL box. Monospace and a real textarea rather than a styled div, because
+ * the point is that someone can actually edit the statement — including
+ * pasting one in — and a contenteditable that eats a newline would make a liar
+ * of the whole panel.
+ */
+.crep__presets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 8px 0;
+}
+
+.crep__preset {
+	padding: 4px 9px;
+	border: 1px solid var(--cin-line, rgba(255, 255, 255, 0.1));
+	border-radius: 999px;
+	background: transparent;
+	color: var(--cin-text-2, #9ca3af);
+	font-size: 11px;
+	cursor: default;
+	transition:
+		border-color 0.15s ease-out,
+		color 0.15s ease-out;
+}
+
+.crep__preset:hover {
+	border-color: var(--cin-accent, #6ea8fe);
+	color: var(--cin-text-1, #e5e7eb);
+}
+
+.crep__sql {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	padding: 9px 11px;
+	border: 1px solid var(--cin-line, rgba(255, 255, 255, 0.12));
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.28);
+	color: var(--cin-text-1, #e5e7eb);
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+	font-size: 11.5px;
+	line-height: 1.6;
+}
+
+.crep__sql:focus {
+	outline: 2px solid color-mix(in srgb, var(--cin-accent, #6ea8fe) 55%, transparent);
+	outline-offset: 1px;
+}
+
+/* A wide result must scroll inside itself rather than widening the overlay. */
+.crep__scroll {
+	max-width: 100%;
+	overflow-x: auto;
+	margin-top: 10px;
+}

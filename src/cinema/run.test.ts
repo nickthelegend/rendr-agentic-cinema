@@ -502,3 +502,54 @@ describe("the film seed", () => {
 		expect(a.graph.nodes[0].output?.seed).not.toBe(b.graph.nodes[0].output?.seed);
 	});
 });
+
+describe("what a call costs", () => {
+	const filmed = () =>
+		graph(
+			[
+				node("c", "character", { text: "A dock worker" }),
+				node("b", "beat", { text: "She waits" }),
+				node("st", "story"),
+				node("sc", "scene", { params: { sceneIndex: 0 } }),
+				node("t", "timeline"),
+			],
+			[
+				["c", "st"],
+				["b", "st"],
+				["st", "sc"],
+				["sc", "t"],
+			],
+		);
+
+	it("records a price on every row rather than leaving the column null", async () => {
+		// The bug this pins: `cost_usd` was declared in the schema, queried by
+		// every spend panel, and written by nothing. The dock estimated a run at
+		// "about $0.24" and the ledger reported null after it.
+		const entries: LedgerEntry[] = [];
+		await runGraph(provider(), filmed(), { onRecord: (entry) => entries.push(entry) });
+		expect(entries.length).toBeGreaterThan(0);
+		for (const entry of entries) expect(entry.costUsd, entry.kind).toBeTypeOf("number");
+	});
+
+	it("prices a picture above a text call", async () => {
+		const entries: LedgerEntry[] = [];
+		await runGraph(provider(), filmed(), { onRecord: (entry) => entries.push(entry) });
+		const picture = entries.find((entry) => entry.kind === "scene");
+		const text = entries.find((entry) => entry.kind === "story");
+		expect(picture?.costUsd ?? 0).toBeGreaterThan(text?.costUsd ?? 0);
+	});
+
+	it("charges for a failed call too", async () => {
+		// A spend figure that quietly excludes failures is the one that produces
+		// a surprise invoice.
+		const angry = provider({
+			image: async () => {
+				throw new ProviderError("no", "safety");
+			},
+		});
+		const entries: LedgerEntry[] = [];
+		await runGraph(angry, filmed(), { onRecord: (entry) => entries.push(entry) });
+		const failure = entries.find((entry) => !entry.ok);
+		expect(failure?.costUsd).toBeGreaterThan(0);
+	});
+});

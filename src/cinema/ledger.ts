@@ -110,6 +110,23 @@ export interface Ledger {
 	/** What this film has cost so far, for the auto-mode spend ceiling. */
 	spentOn(graphId: string): Promise<{ calls: number; costUsd: number }>;
 	/**
+	 * Runs a read the caller wrote, and returns whatever comes back.
+	 *
+	 * The point of this is not convenience — every number the panels show is
+	 * already computed by a query in this file. It is that a claim about a
+	 * database is worth much less than a database somebody else can interrogate.
+	 * A judge who can type their own SELECT and get their own answer does not
+	 * have to take the panel's word for anything.
+	 *
+	 * Safe because the server in front of Clickhouse only forwards statements
+	 * matching an allow-list of shapes — reads against the one table, the two
+	 * that create it, and the single UPDATE that records a verdict. Anything
+	 * else is refused there rather than being trusted here, which is the right
+	 * place for that decision: the browser is not where a security boundary
+	 * goes.
+	 */
+	query(sql: string): Promise<{ columns: string[]; rows: Array<Record<string, unknown>> }>;
+	/**
 	 * Marks one take kept or discarded.
 	 *
 	 * The judgement is what makes the rest of the table mean anything: without
@@ -317,6 +334,18 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 					`WHERE graph_id = '${escape(graphId)}' AND node_id = '${escape(nodeId)}' ` +
 					`AND at = '${escape(at)}'`,
 			);
+		},
+
+		async query(sql) {
+			const text = await run(sql, "JSONEachRow");
+			const rows = text
+				.split("\n")
+				.filter((line) => line.trim())
+				.map((line) => JSON.parse(line) as Record<string, unknown>);
+			// Columns from the first row rather than from a DESCRIBE: the proxy
+			// does not forward DESCRIBE, correctly, and the rows already carry
+			// their own keys.
+			return { columns: rows.length > 0 ? Object.keys(rows[0]) : [], rows };
 		},
 
 		async insights(graphId) {

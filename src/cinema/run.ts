@@ -32,6 +32,7 @@ import {
 } from "./nodes";
 import { type CinemaProvider, ProviderError } from "./provider";
 import { renderScene } from "./scene";
+import { callCost } from "./sound";
 import { castFrom, checkContinuity, decomposeStory } from "./story";
 
 export interface RunOptions {
@@ -65,6 +66,8 @@ export interface LedgerEntry {
 	prompt?: string;
 	seed?: number;
 	elapsedMs: number;
+	/** What this one call cost, so the ledger's spend column is not always null. */
+	costUsd?: number;
 	ok: boolean;
 	error?: string;
 	/** Classified, so "wait or pay" stays distinct from "reword it". */
@@ -199,6 +202,12 @@ export async function runGraph(
 				prompt: output.prompt ?? node.text ?? "",
 				seed: output.seed,
 				elapsedMs: Date.now() - at,
+				// The column existed, every spend panel queried it, and nothing
+				// ever wrote it — so the dock estimated "about $0.24" before a run
+				// and the ledger reported null after one. Same class of bug as the
+				// empty prompt column: a schema promising something the writer
+				// never delivered.
+				costUsd: callCost(node.kind),
 				ok: true,
 			});
 		} catch (error) {
@@ -230,6 +239,10 @@ export async function runGraph(
 					node.text?.trim() ||
 					`${nodeSpec(node.kind)?.label ?? node.kind}: ${node.label ?? node.id}`,
 				elapsedMs: Date.now() - at,
+				// A failed call is still a billed call almost everywhere, and a
+				// spend figure that quietly excludes the failures is the one that
+				// gets someone a surprise invoice.
+				costUsd: callCost(node.kind),
 				ok: false,
 				error: message,
 				errorKind: error instanceof ProviderError ? error.kind : undefined,

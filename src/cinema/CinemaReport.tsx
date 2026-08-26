@@ -350,12 +350,148 @@ export function CinemaReport({
 								) : null}
 							</>
 						)}
+						{ledger ? <Console ledger={ledger} graphId={graph.id} /> : null}
 					</div>
 				) : null}
 
 				{tab === "chain" ? <Provenance graph={graph} manifest={manifest} /> : null}
 			</div>
 		</div>
+	);
+}
+
+/**
+ * A box you can type SQL into, against the database the panels read.
+ *
+ * Every number above this is computed by a query already. What this adds is
+ * that a viewer does not have to believe any of them: the table is real, it is
+ * reachable, and someone who wants to check can write their own SELECT and read
+ * their own answer.
+ *
+ * The refusals are part of the demonstration rather than an inconvenience. The
+ * proxy in front of Clickhouse forwards an allow-list of statement shapes, so a
+ * DROP typed in here comes back as a plain refusal from the server — which is
+ * the correct place for that decision and visibly is.
+ */
+function Console({ ledger, graphId }: { ledger: Ledger; graphId: string }) {
+	const PRESETS: Array<{ label: string; sql: string }> = [
+		{
+			label: "Slowest calls",
+			sql:
+				"SELECT node_kind, prompt, elapsed_ms FROM generations " +
+				"WHERE ok = 1 ORDER BY elapsed_ms DESC LIMIT 10",
+		},
+		{
+			label: "Spend by day",
+			sql:
+				"SELECT toDate(at) AS day, count() AS calls, round(sum(cost_usd), 4) AS usd " +
+				"FROM generations GROUP BY day ORDER BY day DESC",
+		},
+		{
+			label: "This film only",
+			sql:
+				`SELECT node_kind, count() AS calls, countIf(ok = 0) AS failed ` +
+				`FROM generations WHERE graph_id = '${graphId.replace(/'/g, "")}' ` +
+				`GROUP BY node_kind ORDER BY calls DESC`,
+		},
+		{
+			label: "Refused on purpose",
+			sql: "DROP TABLE generations",
+		},
+	];
+
+	const [sql, setSql] = useState(PRESETS[0].sql);
+	const [result, setResult] = useState<{
+		columns: string[];
+		rows: Array<Record<string, unknown>>;
+	} | null>(null);
+	const [problem, setProblem] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+
+	const ask = async (statement: string) => {
+		setBusy(true);
+		setProblem(null);
+		try {
+			setResult(await ledger.query(statement));
+		} catch (failure) {
+			setResult(null);
+			setProblem(String(failure instanceof Error ? failure.message : failure));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<>
+			<h4 className="crep__sub">Ask it yourself</h4>
+			<div className="crep__presets">
+				{PRESETS.map((preset) => (
+					<button
+						key={preset.label}
+						type="button"
+						className="crep__preset"
+						onClick={() => {
+							setSql(preset.sql);
+							void ask(preset.sql);
+						}}
+					>
+						{preset.label}
+					</button>
+				))}
+			</div>
+			<textarea
+				className="crep__sql"
+				aria-label="SQL"
+				spellCheck={false}
+				rows={3}
+				value={sql}
+				onChange={(event) => setSql(event.target.value)}
+			/>
+			<div className="crep__acts">
+				<button
+					type="button"
+					className="crep__close"
+					disabled={busy}
+					onClick={() => void ask(sql)}
+				>
+					{busy ? "Running…" : "Run"}
+				</button>
+			</div>
+
+			{problem ? <p className="crep__bad">{problem}</p> : null}
+
+			{result && result.rows.length === 0 && !problem ? (
+				<p className="crep__none">That query is valid and matched nothing.</p>
+			) : null}
+
+			{result && result.rows.length > 0 ? (
+				<div className="crep__scroll">
+					<table className="crep__table">
+						<thead>
+							<tr>
+								{result.columns.map((column) => (
+									<th key={column}>{column}</th>
+								))}
+							</tr>
+						</thead>
+						<tbody>
+							{result.rows.slice(0, 40).map((row, index) => (
+								<tr key={`${index}-${String(row[result.columns[0]])}`}>
+									{result.columns.map((column) => (
+										<td key={column}>{String(row[column] ?? "")}</td>
+									))}
+								</tr>
+							))}
+						</tbody>
+					</table>
+					{result.rows.length > 40 ? (
+						<p className="crep__none">
+							{result.rows.length - 40} more rows, not shown.
+						</p>
+					) : null}
+				</div>
+			) : null}
+		</>
 	);
 }
 

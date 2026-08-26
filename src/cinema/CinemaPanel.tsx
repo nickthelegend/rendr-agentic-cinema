@@ -587,6 +587,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 								prompt: entry.prompt ?? "",
 								seed: entry.seed,
 								elapsedMs: entry.elapsedMs,
+								costUsd: entry.costUsd,
 								ok: entry.ok,
 								error: entry.error,
 								errorKind: entry.errorKind,

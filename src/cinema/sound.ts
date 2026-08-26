@@ -224,6 +224,23 @@ export const DEFAULT_TEXT_USD = 0.001;
  * actually need running, because "this will cost $2.40" for a graph that will
  * skip nine of its twelve nodes is worse than saying nothing.
  */
+/**
+ * What one call of a given kind costs.
+ *
+ * Pulled out of `estimateCost` so the estimate and the recorded figure cannot
+ * disagree. They did: the ledger declared a `cost_usd` column, every panel that
+ * reads spend queried it, and nothing ever wrote it — so the estimate said
+ * "about $0.24" before a run and the ledger said null after one.
+ *
+ * Character and scene nodes make a picture; story and world ask for text.
+ * Everything else is arithmetic on this machine and costs nothing.
+ */
+export function callCost(kind: string, rates: { image?: number; text?: number } = {}): number {
+	if (kind === "character" || kind === "scene") return rates.image ?? DEFAULT_IMAGE_USD;
+	if (kind === "story" || kind === "world") return rates.text ?? DEFAULT_TEXT_USD;
+	return 0;
+}
+
 export function estimateCost(
 	nodes: CinemaNode[],
 	rates: { image?: number; text?: number } = {},
