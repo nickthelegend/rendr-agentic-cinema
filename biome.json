@@ -10,7 +10,8 @@
 			"!!**/dist-ssr",
 			"!!**/release",
 			"!!**/.tmp",
-			"!!**/electron/native/**/build"
+			"!!**/electron/native/**/build",
+			"!!**/deploy/public"
 		]
 	},
 	"formatter": {

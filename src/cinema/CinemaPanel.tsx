@@ -77,6 +77,24 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	);
 
 	/**
+	 * Saves a file and says so.
+	 *
+	 * Every download here is silent by construction — an anchor click that the
+	 * browser either honours somewhere out of sight or blocks outright. In a
+	 * sandboxed frame it blocks, and a button that does nothing visible is
+	 * indistinguishable from a broken one. Naming the file that just left is the
+	 * whole difference between "that did nothing" and "that worked, look in
+	 * Downloads".
+	 */
+	const saveFile = useCallback(
+		(name: string, type: string, body: string) => {
+			download(name, type, body);
+			notice(`Saved ${name}.`);
+		},
+		[notice],
+	);
+
+	/**
 	 * Connects the ledger and makes sure its table exists.
 	 *
 	 * Called when a film opens rather than only when a render starts. Deferring
@@ -626,7 +644,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 			keywords: "csv spreadsheet",
 			unavailable: shots.length === 0 ? "Decompose the story first" : undefined,
 			run: () =>
-				download(
+				saveFile(
 					`${graph.name || "film"} shot list.csv`,
 					"text/csv",
 					shotListCsv(graph, shots, api.timeline.fps),
@@ -638,7 +656,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 			group: "Export",
 			keywords: "json save share",
 			run: () =>
-				download(
+				saveFile(
 					`${graph.name || "film"}.film.json`,
 					"application/json",
 					exportFilm(graph),
@@ -726,7 +744,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				onTidy={() => api.updateCinemaGraph(autoLayout(graph))}
 				onShotList={() =>
 					shots.length
-						? download(
+						? saveFile(
 								`${graph.name || "film"} shot list.csv`,
 								"text/csv",
 								shotListCsv(graph, shots, api.timeline.fps),
@@ -737,7 +755,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				placeable={placeable}
 				onTestConnection={testConnection}
 				onExport={() =>
-					download(
+					saveFile(
 						`${graph.name || "film"}.film.json`,
 						"application/json",
 						exportFilm(graph),
@@ -855,7 +873,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 					<CinemaReport
 						graph={graph}
 						initialTab={report}
-						onDownload={download}
+						onDownload={saveFile}
 						ledger={ledgerReady ? ledger.current : null}
 						onClose={() => setReport(null)}
 					/>

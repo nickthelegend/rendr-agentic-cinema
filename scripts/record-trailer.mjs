@@ -34,7 +34,10 @@ const VOICE = "af_heart";
 const BEATS = [
 	{
 		say: "Every tool that generates video hands you a clip. When the third shot is wrong, you regenerate, and you hope.",
-		run: async () => {},
+		run: async () => {
+			// Nothing to drive: this beat only holds what the last one left on screen
+			// while the line is spoken over it.
+		},
 	},
 	{
 		say: "This one hands you a film crew. Agentic Cinema is a node graph that casts, writes and shoots — and gives you back a timeline.",
@@ -46,7 +49,10 @@ const BEATS = [
 	},
 	{
 		say: "A film starts empty. There are four ways in: a story, a character, a first frame, or the world they live in.",
-		run: async () => {},
+		run: async () => {
+			// Nothing to drive: this beat only holds what the last one left on screen
+			// while the line is spoken over it.
+		},
 	},
 	{
 		say: "Or start from a shape. A short film is five beats, a cast, a world, and five shots waiting to be taken.",
@@ -58,7 +64,10 @@ const BEATS = [
 	},
 	{
 		say: "The hard problem here is not generating a picture. It is generating eleven pictures of the same person.",
-		run: async () => {},
+		run: async () => {
+			// Nothing to drive: this beat only holds what the last one left on screen
+			// while the line is spoken over it.
+		},
 	},
 	{
 		say: "So a character is not a prompt. It is an identity, locked once: a sheet of angles, a seed, a description that every later shot refers back to.",
