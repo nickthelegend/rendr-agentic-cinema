@@ -461,10 +461,16 @@
 	opacity: 0.3;
 	cursor: default;
 }
-/* The selected tool inverts, which is the reference's one loud moment. */
+/* The selected tool inverts, which is the reference's one loud moment — and it
+   is exactly one control, so a toggle may never borrow it. */
 .cshell__tool[data-active] {
 	background: #fff;
 	color: #111114;
+}
+/* A toggle that is on: lit, not inverted. */
+.cshell__tool[data-on] {
+	background: rgba(255, 255, 255, 0.09);
+	color: var(--ink);
 }
 
 .cshell__assets {

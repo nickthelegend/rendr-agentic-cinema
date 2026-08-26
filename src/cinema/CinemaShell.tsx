@@ -53,7 +53,16 @@ export interface ShellAction {
 	icon: ReactNode;
 	onClick?: () => void;
 	disabled?: boolean;
+	/** The selected pointer tool. Inverts — only ever one at a time. */
 	active?: boolean;
+	/**
+	 * A toggle that is currently on.
+	 *
+	 * Deliberately a different state from `active`. Both used to invert, so a
+	 * dock with the grid switched on showed two white circles and the eye
+	 * stopped reading as "this is the tool you are holding".
+	 */
+	on?: boolean;
 }
 
 export interface CinemaShellProps {
@@ -163,12 +172,13 @@ const STARTERS: Array<{
 	},
 ];
 
-function Tool({ label, icon, onClick, disabled, active }: ShellAction) {
+function Tool({ label, icon, onClick, disabled, active, on }: ShellAction) {
 	return (
 		<button
 			type="button"
 			className="cshell__tool"
 			data-active={active || undefined}
+			data-on={on || undefined}
 			title={label}
 			aria-label={label}
 			aria-pressed={active}
@@ -415,19 +425,19 @@ export function CinemaShell(props: CinemaShellProps) {
 						<Tool
 							label="Minimap"
 							icon={<IconMap />}
-							active={props.showMap}
+							on={props.showMap}
 							onClick={props.onToggleMap}
 						/>
 						<Tool
 							label={props.showThumbs ? "Hide previews" : "Show previews"}
 							icon={<IconEyeOff />}
-							active={!props.showThumbs}
+							on={!props.showThumbs}
 							onClick={props.onToggleThumbs}
 						/>
 						<Tool
 							label={props.showGrid ? "Hide the grid" : "Show the grid"}
 							icon={<IconGridDots />}
-							active={props.showGrid}
+							on={props.showGrid}
 							onClick={props.onToggleGrid}
 						/>
 						<span className="cshell__zoom">100%</span>

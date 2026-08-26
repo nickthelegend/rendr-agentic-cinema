@@ -144,3 +144,92 @@ item; any error anywhere fails the item.
 | L1 | Console | Zero errors and zero unhandled rejections across every item above |
 | L2 | Network | Zero failed requests; every ClickHouse call returns 200 |
 | L3 | No mocks in the tested path | The stub provider is the only stand-in and is reached **only** because no API key exists; the ledger, persistence, downloads and timeline are all real |
+
+
+---
+
+# Results — final pass
+
+Executed in a real Chromium against the running app, a real ClickHouse 24.8 in
+Docker (container `rendr-clickhouse`, verified persistent across a stop/start),
+and real file bytes captured at `URL.createObjectURL`.
+
+**Claude in Chrome reported no connected browsers**, so the Browser pane was
+used — a real Chromium driving the real product, not the code.
+
+| # | Status | Note |
+|---|---|---|
+| A1 | PASS | titlebar `none`, one `.cshell__bar` |
+| A2 | **FIXED → PASS** | menus were unreachable inside a film; slot declared, never rendered |
+| A3 | **FIXED → PASS** | Notes and Cast glyphs were no-ops |
+| A4 | PASS | budget 60 → 52 after 8 calls, read from the table |
+| A5 | PASS | agent rail toggles 1280 → 0 → 1280 |
+| A6 | PASS | Timeline icon closes the film, titlebar returns |
+| A7 | **FIXED → PASS** | 5 dead tools wired; then toggles were borrowing the selected-tool invert — now exactly one inverted control |
+| A8 | PASS | presence pill reads `0` |
+| B1 | PASS | empty film, 0 nodes, typed name in the bar |
+| B2 | PASS | badge, heading, subtitle, 4 cards, 2 actions |
+| B3 | PASS | all four cards create story/character/scene/world |
+| B4–B7 | PASS | 14/14/17/14 nodes, 0 preflight problems, laid out, distinct shot indices |
+| B8 | PASS | 4374 bytes, `rendr-cinema/1`, 14 nodes, 17 edges, no base64 |
+| B9 | PASS | round-trip to 14 nodes, all `idle` |
+| B10 | PASS | exact messages for non-JSON, wrong format, zero nodes; no film created |
+| C1 | PASS | 10-item picker at the pointer, creates that kind, no zoom |
+| C2 | PASS | pane click dismisses without creating |
+| C3 | PASS | palette adds one node, 17 edges held |
+| C4 | PASS | click selects, pane click deselects |
+| C5 | PASS | copies inbound wires only, arrives `idle` |
+| C6/C7 | **UNTESTED** | React Flow's handle drag could not be driven from this harness; the rule is covered by unit tests but was not exercised through the real canvas |
+| C8 | PASS | 14 nodes across 4 dependency columns |
+| C9 | PASS | undo steps back and the canvas follows |
+| C10 | PASS | covered by C5/C8 graph integrity |
+| D1 | PASS | correct per-kind fields for character/world/story |
+| D2 | PASS | 11/9/8/11/8 options |
+| D3 | PASS | anamorphic + Tri-X appear verbatim in the recorded prompt |
+| D4 | PASS | 5/5 scenes carry inferred size, lighting and negative clauses |
+| D5 | PASS | character edit marks character+story+5 scenes; world and beats untouched |
+| D6 | **FIXED → PASS** | history never refreshed after a re-run |
+| D7 | PASS | Keep/Discard persist as `accepted` 1/0 |
+| D8 | PASS | leaderboard ranks kept prompts, no blank rows |
+| E1–E4 | PASS | all ready, running visible, `Render 8 · ~$0.24`, disabled when fresh |
+| E5 | **UNTESTABLE** | no Gemini API key exists in this repo or environment |
+| E6 | PASS | 7 succeeded, 1 failed, run continued |
+| E7 | **FIXED → PASS** | "Re-run" silently skipped ready nodes |
+| F1 | PASS | 13 columns, MergeTree, `ORDER BY (graph_id, at)`, created by the app |
+| F2 | PASS | 8 rows for 8 calls |
+| F3 | **FIXED → PASS** | failure rows were anonymous |
+| F4 | PASS | model, elapsed_ms, ok all sound |
+| F5 | PASS | inspector history matches the table |
+| F6 | PASS | mutation `is_done=1`, exact row by timestamp |
+| F7 | PASS | only kept, non-empty prompts, scoped to the film |
+| F8 | PASS | equals the real row count |
+| F9 | PASS | render completed with the container stopped, zero unhandled rejections |
+| G1–G4 | PASS | toggle, debounce, confirm with real numbers, ceiling refusal |
+| G5 | **FIXED → PASS** | unreachable ledger read as a *zero* spend, so auto mode rendered anyway |
+| H1 | PASS | preflight refuses the run and names the reason |
+| H2 | PASS | new film shows no problem chips |
+| H3 | PASS | "asks for shot 9, but the story only produced 5" |
+| H4 | PASS | "runs 18s against a 30s target — short by 40%" |
+| I1 | PASS | correct header, comma values quoted, timecode accumulates to `00:00:07:15` |
+| I2 | PASS | refuses with a reason rather than an empty file |
+| J1–J3 | PASS | 5 clips in order, frames `[120,105,90,150,75]`, `scale`+`position` keyframes on each |
+| J4 | PASS | disabled with nothing rendered |
+| K1 | PASS | names both models, honest about the missing key |
+| K2 | **UNTESTABLE** | needs an API key |
+| L1 | PASS | zero page errors, zero unhandled rejections on a clean load |
+| L2 | PASS | every ClickHouse request 200 OK |
+| L3 | PASS with one exception | the stub provider is the only stand-in, reached solely because no key exists |
+
+## Not defects
+
+**React Flow container warning.** Fires only while the preview pane is hidden,
+when the entire app measures 0×0. With the pane visible the container is
+994×666 and no warning is emitted. No CSS addresses "the app has no size".
+
+**Two reverted changes.** Repeated DOM counts said the canvas lost its edges
+after a node was added. The screenshots never agreed and the model was intact
+throughout; `querySelectorAll` on React Flow's SVG classes is unreliable in this
+eval context. The changes that finding prompted were reverted.
+
+**Stub timings.** `elapsed_ms` of 60007 for a 260ms sleep is the hidden pane
+clamping timers, honestly recorded.
