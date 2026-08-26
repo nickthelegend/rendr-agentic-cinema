@@ -85,6 +85,15 @@ export const IconUser = ({ size = 16 }: P) => (
 		<path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
 	</svg>
 );
+/* A cone and two arcs. Speech leaving the film, rather than a mouth or a
+   microphone — what this control does is make the *cut* audible, not record
+   anybody. */
+export const IconSpeaker = ({ size = 16 }: P) => (
+	<svg {...svg(size)}>
+		<path d="M4 9.5h3L11.5 6v12L7 14.5H4z" />
+		<path d="M15 9.4a4 4 0 0 1 0 5.2M17.8 7a7.5 7.5 0 0 1 0 10" />
+	</svg>
+);
 export const IconAgent = ({ size = 15 }: P) => (
 	<svg {...svg(size)}>
 		<rect x="3.5" y="7.5" width="17" height="12" rx="3" />

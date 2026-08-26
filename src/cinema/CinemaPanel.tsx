@@ -22,11 +22,12 @@ import { readyScenes } from "./commit";
 import { exportFilm, shotListCsv } from "./deliver";
 import { addNode, autoLayout, preflight } from "./graphOps";
 import { createClickhouseLedger, type Ledger } from "./ledger";
+import { type NarrationProgress, narrationName, speak } from "./narrate";
 import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, needsRun, runGraph } from "./run";
 import { moveFor } from "./scene";
-import { estimateCost } from "./sound";
+import { estimateCost, lines as spokenLines, voiceFor } from "./sound";
 import { reviewCut } from "./structure";
 import { createStubProvider } from "./stubProvider";
 
@@ -62,6 +63,9 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	const [showNotes, setShowNotes] = useState(true);
 	const [tool, setTool] = useState<"select" | "pan">("select");
 	const [report, setReport] = useState<null | "cast" | "ledger" | "chain">(null);
+	// Narration progress, or null when nothing is being spoken. The model takes
+	// a moment per line and silence during it reads as a hang.
+	const [narrating, setNarrating] = useState<NarrationProgress | null>(null);
 	// How much of the current run is done, for the fill on the render control.
 	const [progress, setProgress] = useState(0);
 	const [palette, setPalette] = useState(false);
@@ -208,6 +212,77 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, []);
+
+	/**
+	 * Speaks the cut and lays the voices under it.
+	 *
+	 * The plan already existed — who says what, where it lands, how much room
+	 * the shot gives it. This is the part that was missing: the lines are
+	 * actually spoken, on this machine, and land on the timeline's audio track
+	 * at the frame the story put them at.
+	 *
+	 * Placed by `at`, not sequentially. A line belongs under its shot; queuing
+	 * them end to end would drift out of sync with the picture by the third one.
+	 */
+	const narrate = useCallback(async () => {
+		const script = spokenLines(
+			graph,
+			graph.nodes.find((node) => node.kind === "story")?.output?.scenes ?? [],
+		);
+		if (script.length === 0) {
+			notice("Nothing to say yet — decompose the story first.", "error");
+			return;
+		}
+		setNarrating({ done: 0, total: script.length, saying: "" });
+		try {
+			const spoken = await speak(
+				script,
+				(line) => {
+					const who = graph.nodes.find((node) => node.id === line.characterId);
+					// Narration with no character speaks in the film's own voice.
+					return who ? voiceFor(who) : "warm";
+				},
+				setNarrating,
+			);
+
+			const files = spoken.map(
+				(entry, index) =>
+					new File([entry.blob], narrationName(entry.line, index), { type: "audio/wav" }),
+			);
+			const assets = await api.importMedia(files);
+			if (assets.length !== files.length) {
+				notice(
+					`Only ${assets.length} of ${files.length} lines imported — nothing placed.`,
+					"error",
+				);
+				return;
+			}
+			const fps = api.timeline.fps;
+			for (const [index, entry] of spoken.entries()) {
+				api.placeAsset(assets[index].id, Math.round(entry.line.at * fps));
+			}
+
+			// A line that runs past its shot is a note nobody gave you, and now
+			// that it has actually been said the truth is known rather than
+			// estimated at two and a half words a second.
+			const long = spoken.filter((entry) => entry.overruns);
+			const seconds = spoken.reduce((sum, entry) => sum + entry.seconds, 0);
+			notice(
+				`${spoken.length} line${spoken.length === 1 ? "" : "s"} spoken, ` +
+					`${seconds.toFixed(1)}s of audio` +
+					(long.length > 0
+						? ` — ${long.length} run${long.length === 1 ? "s" : ""} past the cut.`
+						: "."),
+			);
+		} catch (problem) {
+			notice(
+				`Narration failed: ${String(problem instanceof Error ? problem.message : problem).slice(0, 160)}`,
+				"error",
+			);
+		} finally {
+			setNarrating(null);
+		}
+	}, [api, graph, notice]);
 
 	/**
 	 * Lands the rendered scenes on the timeline.
@@ -663,6 +738,19 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				),
 		},
 		{
+			id: "narrate",
+			name: "Speak the cut",
+			group: "Film",
+			keywords: "narrate voice audio tts dialogue say",
+			unavailable:
+				shots.length === 0
+					? "Decompose the story first"
+					: narrating
+						? "Already speaking"
+						: undefined,
+			run: () => void narrate(),
+		},
+		{
 			id: "chain",
 			name: "Provenance",
 			group: "Report",
@@ -757,6 +845,17 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 								shotListCsv(graph, shots, api.timeline.fps),
 							)
 						: notice("Decompose the story first — there are no shots yet.", "error")
+				}
+				onNarrate={() => void narrate()}
+				narrating={narrating}
+				sayable={
+					graph.nodes.find((node) => node.kind === "story")?.output?.scenes?.length
+						? spokenLines(
+								graph,
+								graph.nodes.find((node) => node.kind === "story")?.output?.scenes ??
+									[],
+							).length
+						: 0
 				}
 				onToTimeline={commitToCut}
 				placeable={placeable}

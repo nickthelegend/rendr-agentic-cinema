@@ -41,6 +41,7 @@ import {
 	IconScript,
 	IconShare,
 	IconSparkle,
+	IconSpeaker,
 	IconTimelineView,
 	IconUpload,
 	IconUser,
@@ -95,6 +96,12 @@ export interface CinemaShellProps {
 	onShotList: () => void;
 	onToTimeline: () => void;
 	placeable: number;
+	/** Speaks every line in the cut and lays it under the picture. */
+	onNarrate: () => void;
+	/** Live progress while the voices are being generated, or null. */
+	narrating: { done: number; total: number; saying: string } | null;
+	/** How many lines there are to say. */
+	sayable: number;
 	onTestConnection: () => void;
 	onExport: () => void;
 	onAssets: () => void;
@@ -486,6 +493,24 @@ export function CinemaShell(props: CinemaShellProps) {
 						/>
 						<Tool label="Shot list" icon={<IconFolder />} onClick={props.onShotList} />
 						<Tool label="Cast and voices" icon={<IconUser />} onClick={props.onCast} />
+						{/* The film speaking is the one generative act that needs no
+						    key at all, so it gets its own control rather than
+						    hiding behind ⌘K. The label carries the count because
+						    "speak the cut" tells you nothing about how long it
+						    will take; "speak 6 lines" does. */}
+						<Tool
+							label={
+								props.narrating
+									? `Speaking ${props.narrating.done + 1} of ${props.narrating.total}…`
+									: props.sayable
+										? `Speak ${props.sayable} line(s)`
+										: "Nothing to say yet"
+							}
+							icon={<IconSpeaker />}
+							on={Boolean(props.narrating)}
+							disabled={props.sayable === 0 || Boolean(props.narrating)}
+							onClick={props.onNarrate}
+						/>
 						<Tool label="History" icon={<IconHistory />} onClick={props.onHistory} />
 						<Tool
 							label="Shortcuts"

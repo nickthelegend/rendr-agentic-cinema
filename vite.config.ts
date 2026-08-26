@@ -111,6 +111,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "src"),
+			// Same reason as vitest.config.ts: the package hides its web build.
+			"kokoro-web": path.resolve(__dirname, "node_modules/kokoro-js/dist/kokoro.web.js"),
 		},
 	},
 	optimizeDeps: {

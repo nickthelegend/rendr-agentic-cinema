@@ -13,6 +13,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "src"),
+			// kokoro-js hides its web build behind an `exports` map that only
+			// names the Node entry, and that entry imports `node:fs`. Reached by
+			// absolute path under a name of our own instead.
+			"kokoro-web": path.resolve(__dirname, "node_modules/kokoro-js/dist/kokoro.web.js"),
 		},
 	},
 });

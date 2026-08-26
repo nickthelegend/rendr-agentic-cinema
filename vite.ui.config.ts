@@ -11,6 +11,11 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
+			// kokoro-js publishes an `exports` map whose only condition is the
+			// Node build, which imports `node:fs` and cannot run in a tab. The
+			// web build ships in the same package but the exports map hides it,
+			// so it is reached by absolute path under a name of our own.
+			"kokoro-web": path.resolve(__dirname, "./node_modules/kokoro-js/dist/kokoro.web.js"),
 		},
 	},
 	server: {
