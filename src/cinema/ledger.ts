@@ -45,9 +45,17 @@ export interface LedgerRow {
 }
 
 export interface LedgerConfig {
+	/**
+	 * Where to send statements.
+	 *
+	 * Either an absolute Clickhouse URL, or a same-origin path such as `/ch`.
+	 * The path form is what a hosted build uses: the page talks to its own
+	 * server, which holds the credential and forwards the statement.
+	 */
 	url: string;
-	user: string;
-	password: string;
+	/** Omitted when a proxy in front of Clickhouse holds the credential. */
+	user?: string;
+	password?: string;
 	/** Defaults to `cinema`. */
 	database?: string;
 }
@@ -159,7 +167,12 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 	const base = config.url.replace(/\/+$/, "");
 
 	async function run(sql: string, format?: "JSONEachRow"): Promise<string> {
-		const url = new URL(base);
+		// A same-origin path resolves against the page; an absolute URL is used
+		// as given. `new URL("/ch")` throws without a base, which is why this is
+		// not one expression.
+		const url = /^https?:\/\//i.test(base)
+			? new URL(base)
+			: new URL(base || "/", globalThis.location?.origin ?? "http://localhost");
 		url.searchParams.set("database", database);
 		const response = await fetch(url.toString(), {
 			method: "POST",
@@ -167,7 +180,11 @@ export function createClickhouseLedger(config: LedgerConfig): Ledger {
 				"Content-Type": "text/plain",
 				// Basic rather than a query parameter: credentials in a URL end up
 				// in logs and proxies, the same reason the model key is a header.
-				Authorization: `Basic ${btoa(`${config.user}:${config.password}`)}`,
+				// Omitted when a proxy in front of Clickhouse holds it instead —
+				// a hosted page must not carry the database password in its bundle.
+				...(config.user
+					? { Authorization: `Basic ${btoa(`${config.user}:${config.password ?? ""}`)}` }
+					: {}),
 			},
 			body: format ? `${sql} FORMAT ${format}` : sql,
 		});

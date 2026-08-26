@@ -84,8 +84,9 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		if (!url) return null;
 		const next = createClickhouseLedger({
 			url,
-			user: import.meta.env.VITE_CLICKHOUSE_USER ?? "default",
-			password: import.meta.env.VITE_CLICKHOUSE_PASSWORD ?? "",
+			// Empty in a hosted build: the server proxy holds the credential.
+			user: import.meta.env.VITE_CLICKHOUSE_USER || undefined,
+			password: import.meta.env.VITE_CLICKHOUSE_PASSWORD || undefined,
 		});
 		try {
 			await next.init();

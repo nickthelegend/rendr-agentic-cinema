@@ -20,7 +20,12 @@ export default function App() {
 
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
-		const type = params.get("windowType") || "";
+		// Outside Electron there are no windows to route between, so the only
+		// meaningful destination is the editor. Without this the hosted build
+		// opens on the launcher splash — a judge following the submission link
+		// lands on a screen that does nothing and has no way forward.
+		const isElectron = typeof window.electronAPI !== "undefined";
+		const type = params.get("windowType") || (isElectron ? "" : "editor-next");
 		setWindowType(type);
 		document.documentElement.dataset.windowType = type;
 

@@ -254,3 +254,48 @@ describe("spentOn", () => {
 		expect(await ledger.spentOn("g1")).toEqual({ calls: 5, costUsd: 0 });
 	});
 });
+
+describe("where statements are sent", () => {
+	it("uses an absolute Clickhouse URL as given", async () => {
+		let seen = "";
+		global.fetch = vi.fn(async (url: unknown) => {
+			seen = String(url);
+			return { ok: true, status: 200, text: async () => "" } as Response;
+		}) as never;
+		await createClickhouseLedger({ url: "http://ch:8123", user: "u", password: "p" }).init();
+		expect(seen).toContain("http://ch:8123");
+		expect(seen).toContain("database=cinema");
+	});
+
+	it("resolves a same-origin path against the page", async () => {
+		// The hosted build points at its own server, which holds the credential.
+		// `new URL("/ch")` throws without a base, so this is worth pinning.
+		let seen = "";
+		global.fetch = vi.fn(async (url: unknown) => {
+			seen = String(url);
+			return { ok: true, status: 200, text: async () => "" } as Response;
+		}) as never;
+		await createClickhouseLedger({ url: "/ch" }).init();
+		expect(seen).toMatch(/^https?:\/\/[^/]+\/ch\?database=cinema$/);
+	});
+
+	it("sends no Authorization header when a proxy holds the credential", async () => {
+		let headers: Record<string, string> = {};
+		global.fetch = vi.fn(async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+			headers = init?.headers ?? {};
+			return { ok: true, status: 200, text: async () => "" } as Response;
+		}) as never;
+		await createClickhouseLedger({ url: "/ch" }).init();
+		expect(headers.Authorization).toBeUndefined();
+	});
+
+	it("still sends one when given a user", async () => {
+		let headers: Record<string, string> = {};
+		global.fetch = vi.fn(async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+			headers = init?.headers ?? {};
+			return { ok: true, status: 200, text: async () => "" } as Response;
+		}) as never;
+		await createClickhouseLedger({ url: "http://ch", user: "u", password: "p" }).init();
+		expect(headers.Authorization).toMatch(/^Basic /);
+	});
+});

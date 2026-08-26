@@ -58,3 +58,6 @@ vendor/walletchan/
 .env*.local
 
 preflight-out/
+
+# The built payload for the hosted deploy. Rebuilt by scripts/deploy-web.mjs.
+deploy/public/
