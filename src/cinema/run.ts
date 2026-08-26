@@ -21,6 +21,7 @@ import {
 	descendants,
 	inputsOf,
 	type NodeStatus,
+	nodeSpec,
 	runOrder,
 } from "./nodes";
 import { type CinemaProvider, ProviderError } from "./provider";
@@ -202,7 +203,15 @@ export async function runGraph(
 				// blocked". Recording the prompt beside the classification is what
 				// makes that answerable: "safety" plus the wording that tripped it
 				// is actionable, and either one alone is not.
-				prompt: node.text ?? "",
+				//
+				// A node that failed before its prompt was assembled — a scene
+				// pointing past the end of the shot list, say — has no prompt to
+				// record, and `node.text ?? ""` left those rows anonymous. Naming
+				// the node keeps every row answerable to "which one keeps failing",
+				// without inventing a prompt that was never sent.
+				prompt:
+					node.text?.trim() ||
+					`${nodeSpec(node.kind)?.label ?? node.kind}: ${node.label ?? node.id}`,
 				elapsedMs: Date.now() - at,
 				ok: false,
 				error: message,

@@ -88,3 +88,21 @@ describe("decideAuto", () => {
 		}
 	});
 });
+
+describe("an unknown spend", () => {
+	// The panel used to compute `spent` as
+	// `(await ledger?.spentOn(id))?.calls ?? 0`, which short-circuits on an
+	// absent ledger and yields zero — so an unreachable database read as a
+	// fresh budget and auto mode spent freely. The guard has to treat unknown
+	// as spent-out, and the decision function is where that is provable.
+	it("blocks when the spend is reported as the ceiling", () => {
+		const decision = decideAuto({
+			auto: true,
+			pending: 1,
+			spent: DEFAULT_CALL_CEILING,
+			busy: false,
+		});
+		expect(decision.run).toBe(false);
+		expect(decision.blocked).toBeTruthy();
+	});
+});

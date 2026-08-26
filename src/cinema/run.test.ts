@@ -432,3 +432,24 @@ describe("an explicit re-run", () => {
 		expect(report.skipped).toEqual(["w"]);
 	});
 });
+
+describe("a failure that never reached a prompt", () => {
+	// A scene pointing past the end of the shot list fails before a prompt is
+	// built. `node.text ?? ""` left that row anonymous in the ledger, which
+	// defeats the one question failure rows exist to answer.
+	it("still names the node it was", async () => {
+		const entries: LedgerEntry[] = [];
+		const overreaching = graph(
+			[
+				node("s", "story", { text: "a premise" }),
+				node("sc", "scene", { label: "Shot 9", params: { sceneIndex: 9 } }),
+			],
+			[["s", "sc"]],
+		);
+		await runGraph(provider(), overreaching, { onRecord: (entry) => entries.push(entry) });
+
+		const bad = entries.find((entry) => !entry.ok);
+		expect(bad?.prompt).toBeTruthy();
+		expect(bad?.prompt).toContain("Shot 9");
+	});
+});

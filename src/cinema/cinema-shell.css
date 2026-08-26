@@ -826,3 +826,18 @@
 	right: 324px;
 	max-width: none;
 }
+
+/* Preview and grid toggles, driven from the dock. */
+.cshell[data-thumbs="off"] .cin-node__thumb {
+	display: none;
+}
+.cshell[data-grid="off"] .cshell__canvas {
+	background-image: none;
+}
+.cshell[data-notes="off"] .cin-notes--float,
+.cshell[data-notes="off"] .cin__issues {
+	display: none;
+}
+.cshell[data-tool="pan"] .react-flow__pane {
+	cursor: grab;
+}

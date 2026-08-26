@@ -141,6 +141,8 @@ export interface CinemaCanvasProps {
 	onOpenNode: (nodeId: string | null) => void;
 	/** Shown as a toast — refusals go here rather than being swallowed. */
 	onNotice: (message: string, tone?: "error" | "info") => void;
+	/** Pointer mode. "pan" drags the canvas instead of box-selecting. */
+	tool?: "select" | "pan";
 }
 
 export function CinemaCanvas(props: CinemaCanvasProps) {
@@ -151,7 +153,7 @@ export function CinemaCanvas(props: CinemaCanvasProps) {
 	);
 }
 
-function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
+function Canvas({ graph, onChange, onOpenNode, onNotice, tool = "select" }: CinemaCanvasProps) {
 	const flow = useReactFlow();
 	const issues = useMemo(() => graphIssues(graph), [graph]);
 	const issueFor = useCallback(
@@ -180,6 +182,7 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 		})),
 	);
 	const [dropKind, setDropKind] = useState<CinemaNodeKind | null>(null);
+
 	/**
 	 * Where a double-click asked for a node.
 	 *
@@ -440,6 +443,11 @@ function Canvas({ graph, onChange, onOpenNode, onNotice }: CinemaCanvasProps) {
 					// event to zoom the pane and the gesture never reaches React at
 					// all — the handler looked wired and could not fire.
 					zoomOnDoubleClick={false}
+					// The Pan tool drags the canvas; Select box-selects. Without
+					// this the hand icon was decoration next to a cursor icon that
+					// was permanently lit.
+					panOnDrag={tool === "pan"}
+					selectionOnDrag={tool === "select"}
 					proOptions={{ hideAttribution: false }}
 					defaultEdgeOptions={{ animated: true }}
 				>

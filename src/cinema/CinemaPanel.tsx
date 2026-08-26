@@ -23,7 +23,7 @@ import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, needsRun, runGraph } from "./run";
 import { moveFor } from "./scene";
-import { estimateCost } from "./sound";
+import { castVoices, estimateCost, VOICES } from "./sound";
 import { reviewCut } from "./structure";
 import { createStubProvider } from "./stubProvider";
 
@@ -54,6 +54,10 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	// every run rather than polled: nothing else moves it.
 	const [spent, setSpent] = useState(0);
 	const [showMap, setShowMap] = useState(false);
+	const [showThumbs, setShowThumbs] = useState(true);
+	const [showGrid, setShowGrid] = useState(true);
+	const [showNotes, setShowNotes] = useState(true);
+	const [tool, setTool] = useState<"select" | "pan">("select");
 	// Flips once the ledger is connected, so the inspector re-renders with it.
 	const [ledgerReady, setLedgerReady] = useState(false);
 	// Incremented once a run's ledger writes have landed, so the inspector
@@ -450,6 +454,11 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 	// leaderboard are all live before anything has been run this session.
 	useEffect(() => {
 		let live = true;
+		// `running` belongs to a run, not to the panel. Switching films while one
+		// was in flight left the new film's Render button reading "Rendering…"
+		// and refusing every click, because this component outlives the graph it
+		// is showing.
+		setRunning(false);
 		void connectLedger().then((led) => {
 			if (!live || !led) return;
 			setLedgerReady(true);
@@ -483,13 +492,28 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		const timer = setTimeout(async () => {
 			// Read the spend at fire time, not at schedule time: a manual render
 			// during the debounce window counts against the same ceiling.
-			let spent = 0;
+			//
+			// The absent-ledger case is checked before the call, not after it. As
+			// `(await ledger.current?.spentOn(id))?.calls ?? 0` this short-circuits
+			// on a null ledger, never throws, and yields a spend of zero — so with
+			// Clickhouse unreachable auto mode believed it had spent nothing and
+			// rendered anyway. An unknown spend has to read as the ceiling reached,
+			// which is what the comment claimed and the code did not do.
+			const led = ledger.current;
+			if (!led) {
+				if (live) {
+					notice(
+						"Auto mode paused: the ledger is unreachable, so the spend so far is unknown.",
+						"error",
+					);
+				}
+				return;
+			}
+			let spent: number;
 			try {
-				spent = (await ledger.current?.spentOn(graph.id))?.calls ?? 0;
+				spent = (await led.spentOn(graph.id)).calls;
 			} catch {
-				// An unreachable ledger must not become an unlimited budget. Treat
-				// an unknown spend as the ceiling reached, and say so — refusing to
-				// spend is the safe direction to fail in.
+				// Same reasoning: refusing to spend is the safe direction to fail.
 				if (live) notice("Auto mode paused: the ledger is unreachable.", "error");
 				return;
 			}
@@ -566,6 +590,35 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				onAssets={() => api.setActiveCinemaGraph(null)}
 				showMap={showMap}
 				onToggleMap={() => setShowMap((on) => !on)}
+				tool={tool}
+				onTool={setTool}
+				showThumbs={showThumbs}
+				onToggleThumbs={() => setShowThumbs((on) => !on)}
+				showGrid={showGrid}
+				onToggleGrid={() => setShowGrid((on) => !on)}
+				showNotes={showNotes}
+				onToggleNotes={() => setShowNotes((on) => !on)}
+				onSelectAll={() => {
+					// Selecting a node is what fills the inspector, so "select every
+					// node" means opening the first and telling you how many there
+					// are — the canvas has no multi-node inspector to show.
+					const first = graph.nodes[0];
+					if (!first) {
+						notice("There is nothing on this canvas yet.");
+						return;
+					}
+					api.selectCinemaNode(first.id);
+					notice(`${graph.nodes.length} node(s) on this canvas.`);
+				}}
+				onCast={() => {
+					// castVoices had no UI at all until this button needed one.
+					const cast = castVoices(graph);
+					notice(
+						cast.length
+							? cast.map((who) => `${who.name}: ${VOICES[who.voice]}`).join(" · ")
+							: "No characters in this film yet.",
+					);
+				}}
 				onAddNode={() => api.updateCinemaGraph(addNode(graph, "beat"))}
 				onAgent={() => api.patch({ agentPanelVisible: !state.agentPanelVisible })}
 				onShortcuts={() =>
@@ -589,6 +642,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				}
 			>
 				<CinemaCanvas
+					tool={tool}
 					graph={graph}
 					onChange={api.updateCinemaGraph}
 					onOpenNode={api.selectCinemaNode}
@@ -598,7 +652,9 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				{/* Notes about the film, before anything is rendered. Preflight is
 				    what stops a run; the cut notes are advice and never do. Both are
 				    free — the expensive part is the render. */}
-				{graph.nodes.length > 0 && (problems.length > 0 || notes.length > 0) ? (
+				{showNotes &&
+				graph.nodes.length > 0 &&
+				(problems.length > 0 || notes.length > 0) ? (
 					<div className="cin-notes cin-notes--float">
 						{problems.map((line) => (
 							<p key={line} className="cin-notes__stop">

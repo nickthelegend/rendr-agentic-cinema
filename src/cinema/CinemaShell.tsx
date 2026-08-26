@@ -92,6 +92,18 @@ export interface CinemaShellProps {
 	 *  for a graph too big to see, and most films are not. */
 	showMap: boolean;
 	onToggleMap: () => void;
+	/** Which pointer tool the canvas is in. */
+	tool: "select" | "pan";
+	onTool: (tool: "select" | "pan") => void;
+	onSelectAll: () => void;
+	showThumbs: boolean;
+	onToggleThumbs: () => void;
+	showGrid: boolean;
+	onToggleGrid: () => void;
+	showNotes: boolean;
+	onToggleNotes: () => void;
+	/** Names the cast and the voice each will be read in. */
+	onCast: () => void;
 	onAddNode: () => void;
 	onAgent: () => void;
 	onShortcuts: () => void;
@@ -192,7 +204,13 @@ export function CinemaShell(props: CinemaShellProps) {
 	} = props;
 
 	return (
-		<div className="cshell" data-map={props.showMap || undefined}>
+		<div
+			className="cshell"
+			data-map={props.showMap || undefined}
+			data-thumbs={props.showThumbs ? undefined : "off"}
+			data-grid={props.showGrid ? undefined : "off"}
+			data-notes={props.showNotes ? undefined : "off"}
+		>
 			<header className="cshell__bar">
 				<div className="cshell__cluster">
 					<span className="cshell__mark" aria-hidden>
@@ -301,6 +319,7 @@ export function CinemaShell(props: CinemaShellProps) {
 									: "Nothing to fix"
 						}
 						aria-label="Notes"
+						onClick={props.onToggleNotes}
 					>
 						<IconChecklist />
 						{problems + notes > 0 ? (
@@ -387,7 +406,11 @@ export function CinemaShell(props: CinemaShellProps) {
 							<IconFolder />
 							Assets
 						</button>
-						<Tool label="Select all" icon={<IconCheckSquare />} />
+						<Tool
+							label="Select every node"
+							icon={<IconCheckSquare />}
+							onClick={props.onSelectAll}
+						/>
 						<Tool label="Tidy the graph" icon={<IconGrid />} onClick={props.onTidy} />
 						<Tool
 							label="Minimap"
@@ -395,15 +418,35 @@ export function CinemaShell(props: CinemaShellProps) {
 							active={props.showMap}
 							onClick={props.onToggleMap}
 						/>
-						<Tool label="Hide previews" icon={<IconEyeOff />} />
-						<Tool label="Grid" icon={<IconGridDots />} />
+						<Tool
+							label={props.showThumbs ? "Hide previews" : "Show previews"}
+							icon={<IconEyeOff />}
+							active={!props.showThumbs}
+							onClick={props.onToggleThumbs}
+						/>
+						<Tool
+							label={props.showGrid ? "Hide the grid" : "Show the grid"}
+							icon={<IconGridDots />}
+							active={props.showGrid}
+							onClick={props.onToggleGrid}
+						/>
 						<span className="cshell__zoom">100%</span>
 					</div>
 
 					<div className="cshell__pill">
 						<Tool label="Add a node" icon={<IconPlus />} onClick={props.onAddNode} />
-						<Tool label="Select" icon={<IconCursor />} active />
-						<Tool label="Pan" icon={<IconHand />} />
+						<Tool
+							label="Select"
+							icon={<IconCursor />}
+							active={props.tool === "select"}
+							onClick={() => props.onTool("select")}
+						/>
+						<Tool
+							label="Pan"
+							icon={<IconHand />}
+							active={props.tool === "pan"}
+							onClick={() => props.onTool("pan")}
+						/>
 						<span className="cshell__pill-rule" />
 						<Tool
 							label={pending ? `Render ${pending}` : "Everything is up to date"}
@@ -412,7 +455,7 @@ export function CinemaShell(props: CinemaShellProps) {
 							onClick={onRender}
 						/>
 						<Tool label="Shot list" icon={<IconFolder />} onClick={props.onShotList} />
-						<Tool label="Cast" icon={<IconUser />} />
+						<Tool label="Cast and voices" icon={<IconUser />} onClick={props.onCast} />
 						<Tool label="History" icon={<IconHistory />} onClick={props.onHistory} />
 						<Tool
 							label="Shortcuts"
