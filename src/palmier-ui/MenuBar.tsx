@@ -120,14 +120,54 @@ export function MenuBar({
 								),
 						}),
 				})),
-				{
-					label: state.activeCinemaGraphId ? "Back to Timeline" : "Films…",
-					disabled: !state.activeCinemaGraphId && state.cinemaGraphs.length === 0,
-					action: () =>
-						api.setActiveCinemaGraph(
-							state.activeCinemaGraphId ? null : (state.cinemaGraphs[0]?.id ?? null),
-						),
-				},
+				// Leaving a film for the timeline and coming back used to open
+				// `cinemaGraphs[0]`, which is the right film exactly until you
+				// have two. Every film gets its own line instead — the same
+				// choice the templates above make, and for the same reason: one
+				// item per thing beats a picker you have to build.
+				...(state.activeCinemaGraphId
+					? [
+							{
+								label: "Back to Timeline",
+								action: () => api.setActiveCinemaGraph(null),
+							},
+						]
+					: [
+							...(state.lastCinemaGraphId &&
+							state.cinemaGraphs.some((e) => e.id === state.lastCinemaGraphId)
+								? [
+										{
+											label: `Back to ${
+												state.cinemaGraphs.find(
+													(e) => e.id === state.lastCinemaGraphId,
+												)?.name ?? "the film"
+											}`,
+											action: () =>
+												api.setActiveCinemaGraph(state.lastCinemaGraphId),
+										},
+									]
+								: []),
+							...state.cinemaGraphs
+								.filter((entry) => entry.id !== state.lastCinemaGraphId)
+								.map((entry) => ({
+									label: `Open ${entry.name}`,
+									action: () => api.setActiveCinemaGraph(entry.id),
+								})),
+							// Something has to occupy the slot when there are no
+							// films at all, or the menu silently loses a line and
+							// "where did Films go" becomes the question.
+							...(state.cinemaGraphs.length === 0
+								? [
+										{
+											label: "Films…",
+											disabled: true,
+											action: () => {
+												// Disabled: there is nothing to open.
+											},
+										},
+									]
+								: []),
+						]),
 				{
 					label: "Export Film…",
 					disabled: !state.activeCinemaGraphId,

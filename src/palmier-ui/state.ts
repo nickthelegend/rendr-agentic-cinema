@@ -226,6 +226,21 @@ export interface EditorState {
 	cinemaGraphs: CinemaGraph[];
 	activeCinemaGraphId: string | null;
 	/**
+	 * The film you were last inside, so leaving one for the timeline is a round
+	 * trip rather than a one-way door.
+	 *
+	 * Placing a cut drops you into the editor, which closes the film — correctly,
+	 * because the cinema shell carries its own menus and two title bars is one
+	 * too many. But the way back used to be a menu item that opened
+	 * `cinemaGraphs[0]`, so with a second film you silently landed in the wrong
+	 * one. Remembering which you left costs one string and removes the guess.
+	 *
+	 * Deliberately not persisted: on reopening a project no film is active, and
+	 * offering to return to one from a previous session would be a lie about
+	 * where you were.
+	 */
+	lastCinemaGraphId: string | null;
+	/**
 	 * Previous states of the active graph, newest last.
 	 *
 	 * Cheap because a graph is replaced wholesale on every edit, so this is a
@@ -315,6 +330,7 @@ function initialState(): EditorState {
 		workflows: [],
 		cinemaGraphs: [],
 		activeCinemaGraphId: null,
+		lastCinemaGraphId: null,
 		cinemaUndo: [],
 		selectedCinemaNodeId: null,
 		looks: [],
@@ -364,6 +380,27 @@ const exportCancels = new Map<string, () => void>();
 export const PLAYBACK_RATE = { min: 0.25, max: 4, step: 0.05, default: 1 } as const;
 
 let toastCounter = 0;
+
+/**
+ * Which film "back to the film" should return to.
+ *
+ * Remembers the one being *left*, not the one being entered, so the label always
+ * names where you actually came from. Entering a film leaves the memory alone:
+ * you are already there, and overwriting it would make leaving and returning a
+ * loop back to yourself.
+ *
+ * Exported because the wrong answer here is invisible — the old code opened
+ * `cinemaGraphs[0]`, which is the right film until you own a second one, and
+ * then silently drops you in the wrong graph with nothing to notice.
+ */
+export function rememberedFilm(
+	entering: string | null,
+	active: string | null,
+	remembered: string | null,
+): string | null {
+	if (entering !== null) return remembered;
+	return active ?? remembered;
+}
 
 export function useEditorState() {
 	const [state, setState] = useState<EditorState>(initialState);
@@ -1255,6 +1292,7 @@ export function useEditorState() {
 						workflows: file.workflows ?? [],
 						cinemaGraphs: parseCinemaGraphs(file.cinemaGraphs),
 						activeCinemaGraphId: null,
+						lastCinemaGraphId: null,
 						looks: parseLooks(file.looks),
 						cursorTelemetry: file.cursorTelemetry ?? [],
 						selectedClipIds: [],
@@ -1414,6 +1452,11 @@ export function useEditorState() {
 		setState((current) => ({
 			...current,
 			activeCinemaGraphId: graphId,
+			lastCinemaGraphId: rememberedFilm(
+				graphId,
+				current.activeCinemaGraphId,
+				current.lastCinemaGraphId,
+			),
 			selectedCinemaNodeId: null,
 		}));
 	}, []);

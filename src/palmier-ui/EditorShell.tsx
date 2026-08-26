@@ -105,6 +105,11 @@ function Titlebar({
 }) {
 	const { state, timeline, totalFrames } = api;
 	const recording = state.recording.phase !== "idle";
+	// A remembered id whose film has since been deleted must not draw a button
+	// that goes nowhere, so this resolves the film rather than trusting the id.
+	const lastFilm = state.lastCinemaGraphId
+		? (state.cinemaGraphs.find((entry) => entry.id === state.lastCinemaGraphId) ?? null)
+		: null;
 
 	return (
 		// On macOS the window keeps its traffic lights (hiddenInset), and they sit
@@ -121,6 +126,23 @@ function Titlebar({
 				onExportFrame={onExportFrame}
 				onProjectSettings={onProjectSettings}
 			/>
+
+			{/* Placing a cut lands you here, in the editor, with the film closed —
+			    and until this button existed the only way back was a menu item
+			    three levels down. The round trip is the whole pitch: cut a shot,
+			    go back, re-render it. It deserves one click. */}
+			{!state.activeCinemaGraphId && lastFilm ? (
+				<button
+					type="button"
+					className="pmr-btn"
+					title={`Back to the ${lastFilm.name} graph`}
+					onClick={() => api.setActiveCinemaGraph(lastFilm.id)}
+					style={{ marginLeft: 8, gap: 4 }}
+				>
+					<span aria-hidden="true">←</span>
+					{lastFilm.name}
+				</button>
+			) : null}
 
 			<span style={{ flex: 1 }} />
 
