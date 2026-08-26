@@ -18,6 +18,15 @@ import type { CinemaGraph } from "./nodes";
 
 export interface CinemaReportProps {
 	graph: CinemaGraph;
+	/**
+	 * Which tab to open on.
+	 *
+	 * The panel used to always open on Consistency, so the History control and
+	 * the Ledger command both landed on the cast — a control that opens the
+	 * wrong page is worse than one that does nothing, because it looks like it
+	 * worked.
+	 */
+	initialTab?: "cast" | "ledger";
 	/** Hands the storyboard to the browser. */
 	onDownload: (name: string, type: string, body: string) => void;
 	ledger?: Ledger | null;
@@ -77,8 +86,14 @@ function Sheet({ who }: { who: CastConsistency }) {
 	);
 }
 
-export function CinemaReport({ graph, ledger, onDownload, onClose }: CinemaReportProps) {
-	const [tab, setTab] = useState<"cast" | "ledger">("cast");
+export function CinemaReport({
+	graph,
+	ledger,
+	initialTab = "cast",
+	onDownload,
+	onClose,
+}: CinemaReportProps) {
+	const [tab, setTab] = useState<"cast" | "ledger">(initialTab);
 	const [insights, setInsights] = useState<LedgerInsights | null>(null);
 	const [failed, setFailed] = useState(false);
 

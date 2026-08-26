@@ -12,6 +12,7 @@ import {
 	autoLayout,
 	duplicateNode,
 	findNodes,
+	nextShot,
 	PALETTE_GROUPS,
 	preflight,
 	removeNodes,
@@ -418,5 +419,54 @@ describe("auto-wiring a new node", () => {
 		const before = built.edges.length;
 		const out = addNode(built, "beat");
 		expect(out.edges.length).toBe(before + 1);
+	});
+});
+
+describe("nextShot", () => {
+	const decomposed = (shots: number, covered: number[]) =>
+		graph([
+			node("st", "story", {
+				output: {
+					scenes: Array.from({ length: shots }, (_, index) => ({
+						id: `s${index}`,
+						index,
+						characterIds: [],
+						location: "a street",
+						timeOfDay: "night",
+						camera: "wide",
+						action: "x",
+						durationSeconds: 3,
+					})),
+				},
+			}),
+			...covered.map((index) =>
+				node(`sc${index}`, "scene", { params: { sceneIndex: index } }),
+			),
+		]);
+
+	it("fills the first gap rather than appending", () => {
+		// Shots 0 and 2 are covered; the next scene should take 1, not 2.
+		expect(nextShot(decomposed(4, [0, 2]))).toBe(1);
+	});
+
+	it("takes the first shot when nothing is covered", () => {
+		expect(nextShot(decomposed(3, []))).toBe(0);
+	});
+
+	it("appends only when every shot is covered", () => {
+		// This is the honest case: the story needs more beats, and preflight
+		// says so rather than the node pretending to be fine.
+		expect(nextShot(decomposed(3, [0, 1, 2]))).toBe(3);
+	});
+
+	it("appends when the story has not decomposed yet", () => {
+		expect(nextShot(graph([node("st", "story")]))).toBe(0);
+	});
+
+	it("does not hand a new scene a shot that already has one", () => {
+		const film = decomposed(5, [0, 1, 2, 3]);
+		const out = addNode(film, "scene");
+		const added = out.nodes[out.nodes.length - 1];
+		expect(added.params.sceneIndex).toBe(4);
 	});
 });

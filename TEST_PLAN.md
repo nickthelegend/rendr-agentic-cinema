@@ -146,6 +146,100 @@ item; any error anywhere fails the item.
 | L3 | No mocks in the tested path | The stub provider is the only stand-in and is reached **only** because no API key exists; the ledger, persistence, downloads and timeline are all real |
 
 
+
+---
+
+# Round 2 — the surface added since round 1
+
+Fourteen features shipped after the first pass. Executed against the **hosted
+deployment** at https://web-production-d3da.up.railway.app in Claude in Chrome —
+the real product, not a dev server — with the real Clickhouse behind it.
+
+## M. Hosted deployment
+
+| # | Item | Correct means |
+|---|---|---|
+| M1 | The link opens the app | `/` returns 200 and boots straight into the editor, not the Electron launcher splash |
+| M2 | Health endpoint | `/healthz` returns 200 `ok` |
+| M3 | Ledger proxy forwards | POST `/ch` with a SELECT against `generations` returns rows, 200 |
+| M4 | Proxy refuses anything else | POST `/ch` with `DROP TABLE generations` returns 400 and is **not** forwarded; the table still exists afterwards |
+| M5 | No credentials in the bundle | The served JS contains neither the Clickhouse user nor the password |
+| M6 | Assets cache correctly | Hashed assets carry `immutable`; `index.html` carries `no-cache` |
+| M7 | A missing file does not kill the server | Requesting a path that does not exist returns the app rather than a dead process, and `/healthz` still answers afterwards |
+
+## N. Consistency panel
+
+| # | Item | Correct means |
+|---|---|---|
+| N1 | Opens from the cast control and from ⌘K | Both routes show the same overlay |
+| N2 | Summary counts truthfully | "N of M locked, carried across K rendered shots" matches the graph |
+| N3 | Sheet and appearances | Each character shows its locked angles and every rendered frame it is in, captioned with that shot's framing |
+| N4 | Seed shown | The seed the sheet was locked with appears beside the name |
+| N5 | Claims nothing about likeness | No copy asserts two pictures match |
+| N6 | Escape closes it | The overlay is not a trap |
+| N7 | Empty film | With no cast, it says to add a Character rather than showing an empty grid |
+
+## O. Ledger insights tab
+
+| # | Item | Correct means |
+|---|---|---|
+| O1 | Five headline figures | calls, failed, median, p95, kept — each matching the table |
+| O2 | Per-kind table | One row per node kind with calls, failures and median |
+| O3 | Kept rate before judging | Shows "—", not 0% |
+| O4 | Failure mix | Lists error kinds with counts when failures exist |
+| O5 | Aggregates run in the database | The statements use quantileExact/countIf, not a row dump |
+| O6 | Ledger unreachable | Says so rather than showing zeros |
+
+## P. Run theatre
+
+| # | Item | Correct means |
+|---|---|---|
+| P1 | Running node is visibly active | `data-status="running"` present during a pass |
+| P2 | Progress fills | `--progress` climbs from 0 toward 1 and resets after |
+| P3 | Live canvas | Nodes reach `ready` during the run, not only at the end |
+| P4 | Reduced motion | With the media query on, no animation runs |
+
+## Q. Command palette
+
+| # | Item | Correct means |
+|---|---|---|
+| Q1 | ⌘K opens and closes | Toggles; Escape closes |
+| Q2 | Ranking | "csv" puts Shot list first; "tidy" puts Tidy first |
+| Q3 | Unavailable commands | Greyed, not runnable, and the reason replaces the group |
+| Q4 | Enter runs the top hit | The command fires and the palette closes |
+| Q5 | No match | Says nothing matches rather than showing an empty box |
+
+## R. New graph behaviour
+
+| # | Item | Correct means |
+|---|---|---|
+| R1 | Auto-wire from the palette | A Scene and a Character added from the palette leave zero preflight problems |
+| R2 | Auto-wire never breaks a rule | No inferred edge is one `connectionError` would refuse |
+| R3 | Per-node meters | A rendered generative node shows its elapsed time and seed |
+| R4 | Seed lock | The same film rendered twice locks the same cast seed |
+| R5 | Budget burn-down | The bar and counter both fall by exactly the calls made |
+
+## S. New exports and readouts
+
+| # | Item | Correct means |
+|---|---|---|
+| S1 | Explain the prompt | A rendered scene's prompt is broken into labelled clauses matching what was set |
+| S2 | No invented attribution | A prompt nobody assembled is reported entirely as "Written" |
+| S3 | Shot-size histogram | Counts by size, commonest first, only sizes present |
+| S4 | Storyboard export | Downloads HTML with one figure per shot and frames inlined as data URIs |
+| S5 | Storyboard escaping | Angle brackets in an action do not become markup |
+| S6 | Storyboard before decomposition | The control refuses rather than producing an empty page |
+
+## T. Persistence
+
+| # | Item | Correct means |
+|---|---|---|
+| T1 | Film survives reload | A created film is present after a full reload |
+| T2 | Recovered ready to run | Recovered nodes are `idle`, not claiming output they no longer hold |
+| T3 | No image bytes in storage | The autosave payload contains no base64 sheet data |
+| T4 | Film-only project recovers | A film with no clips on the timeline is still recovered |
+
+
 ---
 
 # Results — final pass

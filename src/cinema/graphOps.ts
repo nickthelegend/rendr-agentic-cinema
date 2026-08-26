@@ -384,6 +384,33 @@ export function autoWire(
 	}
 }
 
+/**
+ * Which shot a new scene node should render.
+ *
+ * The lowest shot the story produced that no scene node covers yet — so adding
+ * a scene fills a gap rather than always appending. It used to take the count
+ * of existing scenes, which meant adding one to a fully covered five-shot film
+ * asked for shot six and landed the user in a red error the moment they
+ * clicked.
+ *
+ * When every shot is covered it does append, and preflight then says the true
+ * thing: the story needs more beats. That is a real answer, not a bug.
+ */
+export function nextShot(graph: CinemaGraph): number {
+	const shots = graph.nodes.find((node) => node.kind === "story")?.output?.scenes?.length ?? 0;
+	const taken = new Set(
+		graph.nodes
+			.filter((node) => node.kind === "scene")
+			.map((node, fallback) =>
+				typeof node.params.sceneIndex === "number" ? node.params.sceneIndex : fallback,
+			),
+	);
+	for (let index = 0; index < shots; index++) {
+		if (!taken.has(index)) return index;
+	}
+	return taken.size;
+}
+
 export function addNode(graph: CinemaGraph, kind: CinemaNodeKind): CinemaGraph {
 	const xs = graph.nodes.map((node) => node.x);
 	const ys = graph.nodes.map((node) => node.y);
@@ -400,13 +427,7 @@ export function addNode(graph: CinemaGraph, kind: CinemaNodeKind): CinemaGraph {
 				kind,
 				x,
 				y,
-				params:
-					kind === "scene"
-						? {
-								sceneIndex: graph.nodes.filter((n) => n.kind === "scene").length,
-								aspect: "16:9",
-							}
-						: {},
+				params: kind === "scene" ? { sceneIndex: nextShot(graph), aspect: "16:9" } : {},
 				status: "idle",
 			},
 		],

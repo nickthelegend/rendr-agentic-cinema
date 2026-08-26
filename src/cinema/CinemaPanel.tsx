@@ -854,6 +854,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				{report ? (
 					<CinemaReport
 						graph={graph}
+						initialTab={report}
 						onDownload={download}
 						ledger={ledgerReady ? ledger.current : null}
 						onClose={() => setReport(null)}
