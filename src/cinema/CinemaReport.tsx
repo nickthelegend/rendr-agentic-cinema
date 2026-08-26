@@ -250,7 +250,13 @@ export function CinemaReport({
 							cast.map((who) => <Sheet key={who.id} who={who} />)
 						)}
 					</div>
-				) : (
+				) : null}
+
+				{/* Explicit rather than an `else`: the ledger body used to be the
+				    fallback for every tab that was not Consistency, so adding a
+				    third tab put "Reading the ledger…" above the provenance
+				    panel. A two-tab assumption survived the third tab silently. */}
+				{tab === "ledger" ? (
 					<div className="crep__body">
 						{!ledger ? (
 							<p className="crep__none">
@@ -333,7 +339,7 @@ export function CinemaReport({
 							</>
 						)}
 					</div>
-				)}
+				) : null}
 
 				{tab === "chain" ? <Provenance graph={graph} manifest={manifest} /> : null}
 			</div>

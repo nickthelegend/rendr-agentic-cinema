@@ -34,6 +34,7 @@ import {
 	IconHistory,
 	IconKeyboard,
 	IconLayers,
+	IconLink,
 	IconMap,
 	IconPanel,
 	IconPeople,
@@ -104,6 +105,8 @@ export interface CinemaShellProps {
 	sayable: number;
 	onTestConnection: () => void;
 	onExport: () => void;
+	/** Puts a link that opens this exact film on the clipboard. */
+	onShareLink: () => void;
 	onAssets: () => void;
 	/** Whether the minimap is showing. Off by default: it is a navigation aid
 	 *  for a graph too big to see, and most films are not. */
@@ -295,6 +298,19 @@ export function CinemaShell(props: CinemaShellProps) {
 					<button type="button" className="cshell__ghost" onClick={props.onLanguage}>
 						<span className="cshell__lang">文A</span>
 						{props.language}
+					</button>
+					{/* Two different acts, so two controls. A link hands someone the
+					    film; a file hands them a copy they own. Collapsing them
+					    into one "share" made the JSON download the only thing that
+					    happened, which is not what anybody means by share. */}
+					<button
+						type="button"
+						className="cshell__glyph"
+						title="Copy a link that opens this film"
+						aria-label="Copy a link that opens this film"
+						onClick={props.onShareLink}
+					>
+						<IconLink />
 					</button>
 					<button
 						type="button"

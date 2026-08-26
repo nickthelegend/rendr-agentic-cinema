@@ -18,6 +18,7 @@ import "./palmier.css";
 import type { CursorTelemetryPoint } from "@/components/video-editor/types";
 import { can } from "@/config/capabilities";
 import { CinemaPanel } from "../cinema/CinemaPanel";
+import { decodeFilm, payloadIn } from "../cinema/share";
 import { autoZoomRegions } from "./autoZoom";
 import { DEFAULT_BACKGROUND } from "./background";
 import { DEFAULT_CURSOR } from "./cursor";
@@ -228,6 +229,43 @@ export function EditorShell() {
 		beginRecording,
 		finishRecording,
 	} = api;
+
+	/**
+	 * A film arriving in the URL.
+	 *
+	 * This is the first thing a judge experiences when someone sends them a
+	 * link: the interesting film is already open rather than being an empty
+	 * canvas and thirty seconds of patience. The fragment is cleared once it is
+	 * read, so a reload does not import the same film a second time and leave
+	 * two identical graphs in the list.
+	 *
+	 * Runs once, deliberately. Re-importing on every render would fight the user
+	 * every time they edited the film they had just been given.
+	 */
+	useEffect(() => {
+		const payload = payloadIn(window.location.href);
+		if (!payload) return;
+		let live = true;
+		void decodeFilm(payload, `cin-${Date.now().toString(36)}`).then(({ graph, error }) => {
+			if (!live) return;
+			// history.replaceState rather than location.hash = "": assigning an
+			// empty hash leaves a bare "#" behind and scrolls the page to the top.
+			window.history.replaceState(
+				null,
+				"",
+				window.location.pathname + window.location.search,
+			);
+			if (error || !graph) {
+				toast(error ?? "That link does not carry a film.", "error");
+				return;
+			}
+			api.addCinemaGraph(graph);
+			toast(`Opened ${graph.name} from a link.`);
+		});
+		return () => {
+			live = false;
+		};
+	}, []);
 
 	// Agents drive this editor through the same reducers the panels use.
 	useAgentBridge(api);

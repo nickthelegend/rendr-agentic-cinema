@@ -94,6 +94,14 @@ export const IconSpeaker = ({ size = 16 }: P) => (
 		<path d="M15 9.4a4 4 0 0 1 0 5.2M17.8 7a7.5 7.5 0 0 1 0 10" />
 	</svg>
 );
+/* Two links of a chain. Distinct from IconShare's outward arrow next to it —
+   these sit side by side and had to be tellable apart at 15px. */
+export const IconLink = ({ size = 15 }: P) => (
+	<svg {...svg(size)}>
+		<path d="M10 13.5a4 4 0 0 0 5.7.4l3-2.8a4 4 0 0 0-5.5-5.8l-1.7 1.6" />
+		<path d="M14 10.5a4 4 0 0 0-5.7-.4l-3 2.8a4 4 0 0 0 5.5 5.8l1.7-1.6" />
+	</svg>
+);
 export const IconAgent = ({ size = 15 }: P) => (
 	<svg {...svg(size)}>
 		<rect x="3.5" y="7.5" width="17" height="12" rx="3" />

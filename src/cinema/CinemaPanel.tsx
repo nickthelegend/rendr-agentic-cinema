@@ -27,6 +27,7 @@ import { emptyGraph } from "./persist";
 import { createGeminiProvider, ProviderError } from "./provider";
 import { estimateRun, needsRun, runGraph } from "./run";
 import { moveFor } from "./scene";
+import { shareLink } from "./share";
 import { estimateCost, lines as spokenLines, voiceFor } from "./sound";
 import { reviewCut } from "./structure";
 import { createStubProvider } from "./stubProvider";
@@ -212,6 +213,26 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		window.addEventListener("keydown", onKey, true);
 		return () => window.removeEventListener("keydown", onKey, true);
 	}, []);
+
+	/**
+	 * Puts a link that opens this exact film on the clipboard.
+	 *
+	 * The fragment, not the query string: a fragment never leaves the browser,
+	 * so a film someone shares is not also handed to whatever is serving the
+	 * page. It carries the recipe rather than the footage, which keeps the link
+	 * pasteable and means the person opening it watches the film being made.
+	 */
+	const copyShareLink = useCallback(async () => {
+		try {
+			const link = await shareLink(graph, window.location.href);
+			await navigator.clipboard.writeText(link);
+			notice(`Link copied — ${link.length} characters.`);
+		} catch {
+			// Clipboard access is denied in plenty of ordinary situations, and a
+			// silent failure here looks exactly like a dead button.
+			notice("The clipboard refused. Use Export this film instead.", "error");
+		}
+	}, [graph, notice]);
 
 	/**
 	 * Speaks the cut and lays the voices under it.
@@ -773,6 +794,13 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				),
 		},
 		{
+			id: "sharelink",
+			name: "Copy a link to this film",
+			group: "Export",
+			keywords: "share url link send",
+			run: () => void copyShareLink(),
+		},
+		{
 			id: "narrate",
 			name: "Speak the cut",
 			group: "Film",
@@ -881,6 +909,7 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 							)
 						: notice("Decompose the story first — there are no shots yet.", "error")
 				}
+				onShareLink={() => void copyShareLink()}
 				onNarrate={() => void narrate()}
 				narrating={narrating}
 				sayable={
