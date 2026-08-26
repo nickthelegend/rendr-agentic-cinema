@@ -258,9 +258,41 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 				return;
 			}
 			const fps = api.timeline.fps;
-			for (const [index, entry] of spoken.entries()) {
-				api.placeAsset(assets[index].id, Math.round(entry.line.at * fps));
-			}
+			// Not placeAsset. It looks the asset up in `state.assets` as that
+			// closure saw it, which is the render *before* the import — so every
+			// call returns early and the audio silently never lands. The picture
+			// path hit the same wall and solved it the same way: one explicit
+			// commit that builds the clips itself, which also makes the whole
+			// narration a single undo rather than one per line.
+			api.commit("Speak the cut", (current) => {
+				const audioIndex = current.tracks.findIndex((track) => track.kind === "audio");
+				if (audioIndex < 0) return current;
+				return {
+					...current,
+					tracks: current.tracks.map((track, index) =>
+						index !== audioIndex
+							? track
+							: {
+									...track,
+									clips: [
+										...track.clips,
+										...spoken.map((entry, at) =>
+											withDefaults({
+												id: `clip-${assets[at].id}-${Math.round(entry.line.at * fps)}`,
+												name: assets[at].name,
+												mediaType: "audio" as const,
+												assetId: assets[at].id,
+												startFrame: Math.round(entry.line.at * fps),
+												endFrame:
+													Math.round(entry.line.at * fps) +
+													Math.max(1, Math.round(entry.seconds * fps)),
+											}),
+										),
+									].sort((a, b) => a.startFrame - b.startFrame),
+								},
+					),
+				};
+			});
 
 			// A line that runs past its shot is a note nobody gave you, and now
 			// that it has actually been said the truth is known rather than
@@ -323,9 +355,12 @@ export function CinemaPanel({ api, menu }: { api: EditorApi; menu?: React.ReactN
 		let cursor = 0;
 		for (const [index, entry] of ready.entries()) {
 			const frames = Math.max(1, Math.round(entry.spec.durationSeconds * fps));
-			api.placeAsset(assets[index].id, cursor);
-			// placeAsset mints this id from the asset and the frame, so it can be
-			// computed rather than read back.
+			// No placeAsset call here, deliberately. It resolves the asset out of
+			// `state.assets` as of the render that created the closure — which is
+			// the render *before* the import — so it returns early every time and
+			// places nothing. The clips below are what actually land, and their
+			// ids follow placeAsset's own `clip-<asset>-<frame>` shape so the
+			// camera moves further down can address them.
 			placements.push({
 				clipId: `clip-${assets[index].id}-${cursor}`,
 				start: cursor,
