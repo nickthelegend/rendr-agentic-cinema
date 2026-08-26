@@ -1466,6 +1466,50 @@
 	-webkit-app-region: no-drag;
 }
 
+/*
+ * The way back into the film you left.
+ *
+ * Not .pmr-btn: that is a fixed 24x24 icon well, and a film called "A rain-dark
+ * port town" put into one wraps onto three lines and shoves the title bar off
+ * its own height. A film name is arbitrary user text, so this is sized by its
+ * content, held on one line, and truncated rather than allowed to eat the bar.
+ */
+.pmr-titlebar__back {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: 200px;
+	height: 22px;
+	padding: 0 8px;
+	border: none;
+	border-radius: var(--pmr-radius-xs);
+	background: var(--pmr-surface-2, rgba(255, 255, 255, 0.05));
+	color: var(--pmr-text-2);
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: default;
+	transition:
+		background 0.15s ease-out,
+		color 0.15s ease-out;
+}
+
+.pmr-titlebar__back:hover {
+	background: var(--pmr-surface-3, rgba(255, 255, 255, 0.09));
+	color: var(--pmr-text-1);
+}
+
+/* The name itself is the part that gets clipped; the arrow always survives. */
+.pmr-titlebar__back span:last-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .pmr-titlebar__name {
 	font-size: 12px;
 	font-weight: 600;

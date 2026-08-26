@@ -134,13 +134,13 @@ function Titlebar({
 			{!state.activeCinemaGraphId && lastFilm ? (
 				<button
 					type="button"
-					className="pmr-btn"
+					className="pmr-titlebar__back"
 					title={`Back to the ${lastFilm.name} graph`}
 					onClick={() => api.setActiveCinemaGraph(lastFilm.id)}
-					style={{ marginLeft: 8, gap: 4 }}
+					style={{ marginLeft: 8 }}
 				>
 					<span aria-hidden="true">←</span>
-					{lastFilm.name}
+					<span>{lastFilm.name}</span>
 				</button>
 			) : null}
 
