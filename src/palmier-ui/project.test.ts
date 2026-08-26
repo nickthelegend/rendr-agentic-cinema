@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_CURSOR } from "./cursor";
 import type { AssetModel } from "./media";
@@ -9,9 +9,12 @@ import {
 	PROJECT_VERSION,
 	ProjectParseError,
 	parseProject,
+	readAutosave,
 	relinkAssets,
 	serializeProject,
 	toManifest,
+	toProjectFile,
+	writeAutosave,
 } from "./project";
 import type { TimelineModel } from "./reducers";
 import { DEFAULT_WEBCAM } from "./webcam";
@@ -190,5 +193,88 @@ describe("recording settings", () => {
 		const file = parseProject(JSON.stringify(raw));
 		expect(file.cursor?.size).toBe(2);
 		expect(file.cursor?.bounceSpeed).toBe(DEFAULT_CURSOR.bounceSpeed);
+	});
+});
+
+describe("autosaving a film", () => {
+	// This suite runs without a DOM, so there is no localStorage and the write
+	// would silently no-op — the catch inside writeAutosave exists precisely so
+	// a missing or full store never breaks editing. A real one in memory is what
+	// makes the round trip testable at all.
+	beforeEach(() => {
+		const store = new Map<string, string>();
+		Object.defineProperty(globalThis, "localStorage", {
+			configurable: true,
+			value: {
+				getItem: (key: string) => store.get(key) ?? null,
+				setItem: (key: string, value: string) => void store.set(key, value),
+				removeItem: (key: string) => void store.delete(key),
+			},
+		});
+	});
+
+	// Built through the real serializer so the test exercises the shape the app
+	// writes, not a hand-made object that could drift from it.
+	const filmProject = (): ProjectFile =>
+		parseProject(
+			JSON.stringify(
+				serializeProject({
+					projectName: "Film only",
+					timelines: [timeline],
+					activeTimelineId: "tl",
+					assets: [],
+					savedAt: "2026-01-01T00:00:00.000Z",
+					cinemaGraphs: [
+						{
+							id: "g1",
+							name: "The Missed Train",
+							auto: false,
+							nodes: [
+								{
+									id: "c1",
+									kind: "character",
+									label: "Lead",
+									text: "a dock worker",
+									x: 10,
+									y: 20,
+									params: {
+										voice: "low",
+										image: { base64: "AAAA", mimeType: "image/png" },
+									},
+									status: "ready",
+									output: { sheet: [{ base64: "BBBB", mimeType: "image/png" }] },
+								},
+							],
+							edges: [],
+						},
+					],
+				}),
+			),
+		);
+
+	it("keeps the decisions and drops the pictures", () => {
+		// Base64 sheets are megabytes; written whole the quota throws, the write
+		// is swallowed, and nothing at all gets autosaved — the timeline lost for
+		// the sake of images that can be regenerated.
+		writeAutosave(filmProject());
+		const back = readAutosave();
+		const node = back?.cinemaGraphs?.[0].nodes[0];
+		expect(node?.text).toBe("a dock worker");
+		expect(node?.params.voice).toBe("low");
+		expect(node?.output).toBeUndefined();
+		expect(node?.params.image).toBeUndefined();
+		expect(JSON.stringify(back)).not.toContain("BBBB");
+	});
+
+	it("comes back ready to run rather than claiming output it lost", () => {
+		writeAutosave(filmProject());
+		expect(readAutosave()?.cinemaGraphs?.[0].nodes[0].status).toBe("idle");
+	});
+
+	it("keeps the wiring and the film's name", () => {
+		writeAutosave(filmProject());
+		const graph = readAutosave()?.cinemaGraphs?.[0];
+		expect(graph?.name).toBe("The Missed Train");
+		expect(graph?.nodes).toHaveLength(1);
 	});
 });

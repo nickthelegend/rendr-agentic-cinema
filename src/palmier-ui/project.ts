@@ -212,9 +212,41 @@ export function downloadProject(project: ProjectFile): void {
  * Autosave keeps the edit across an accidental reload. It stores the same
  * shape as a project file, so recovery is just an open from memory.
  */
+/**
+ * The autosave payload, minus the pictures.
+ *
+ * A rendered film carries a character sheet and a still per scene as base64,
+ * which is megabytes — well past what localStorage will hold. Written whole,
+ * the quota throws, the catch below swallows it, and *nothing* is autosaved:
+ * the timeline is lost too, for the sake of images that can be regenerated.
+ *
+ * So the graph's decisions are kept — the cast, the world, the beats, the shot
+ * settings and the wiring — and the renders are dropped. A recovered film comes
+ * back ready to run rather than pretending to hold output it no longer has,
+ * which is the same contract as importing a film.
+ */
+function withoutRenders(project: ProjectFile): ProjectFile {
+	if (!project.cinemaGraphs?.length) return project;
+	return {
+		...project,
+		cinemaGraphs: project.cinemaGraphs.map((graph) => ({
+			...graph,
+			nodes: graph.nodes.map((node) => ({
+				...node,
+				status: "idle" as const,
+				output: undefined,
+				error: undefined,
+				params: Object.fromEntries(
+					Object.entries(node.params).filter(([key]) => key !== "image"),
+				),
+			})),
+		})),
+	};
+}
+
 export function writeAutosave(project: ProjectFile): void {
 	try {
-		localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project));
+		localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(withoutRenders(project)));
 	} catch {
 		// A full or disabled localStorage must never break editing.
 	}

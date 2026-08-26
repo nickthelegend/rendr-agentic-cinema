@@ -1623,12 +1623,13 @@ export function useEditorState() {
 		if (recovered.current) return;
 		recovered.current = true;
 		const saved = readAutosave();
-		if (
-			!saved ||
-			saved.timelines.every((t) => t.tracks.every((track) => track.clips.length === 0))
-		) {
-			return;
-		}
+		// A film with no clips on the timeline is still work worth recovering.
+		// This used to test the timelines alone, so building a cast and a story
+		// and then reloading lost the lot — the one thing a graph editor must
+		// never do.
+		const hasCut = saved?.timelines.some((t) => t.tracks.some((track) => track.clips.length));
+		const hasFilm = Boolean(saved?.cinemaGraphs?.length);
+		if (!saved || (!hasCut && !hasFilm)) return;
 		setState((current) => ({
 			...current,
 			projectName: saved.projectName,
@@ -1644,11 +1645,19 @@ export function useEditorState() {
 			zoomTiming: saved.zoomTiming ?? current.zoomTiming,
 			comments: saved.comments ?? current.comments,
 			workflows: saved.workflows ?? current.workflows,
+			// Recovered too. The file format has carried these all along and the
+			// recovery simply never read them back, so every reload started the
+			// film again from nothing.
+			cinemaGraphs: saved.cinemaGraphs ?? current.cinemaGraphs,
 			looks: parseLooks(saved.looks).length ? parseLooks(saved.looks) : current.looks,
 			cursorTelemetry: saved.cursorTelemetry ?? current.cursorTelemetry,
 			lastAction: "Recovered autosave",
 		}));
-		toast(`Recovered "${saved.projectName}" from autosave — media needs relinking.`);
+		toast(
+			hasFilm && !hasCut
+				? `Recovered "${saved.projectName}" — the film is back, ready to render.`
+				: `Recovered "${saved.projectName}" from autosave — media needs relinking.`,
+		);
 	}, [toast]);
 
 	/** Don't let a reload discard unsaved work silently. */
