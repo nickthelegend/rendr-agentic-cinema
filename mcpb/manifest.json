@@ -3,17 +3,29 @@
   "name": "rendr",
   "display_name": "Rendr",
   "version": "0.1.0",
-  "description": "Record and edit video with Rendr from Claude Desktop.",
-  "long_description": "Connects Claude Desktop to the local MCP server inside Rendr, an open-source app that records and edits screen video in one place. Claude can list capture sources, start and stop recordings, and add zoom punch-ins driven by the cursor telemetry captured alongside the video. The editing tool surface is declared but still being built \u2014 those tools return an explicit not_implemented error rather than pretending to succeed.",
+  "description": "Record, edit and direct film with Rendr from Claude Desktop.",
+  "long_description": "Connects Claude Desktop to the MCP server inside Rendr Agentic Cinema, an open-source app that records, edits and generates video in one place. All 102 declared tools are implemented: capture sources and recording, the cursor-driven zoom punch-ins, and the full editing surface — clips, transitions, captions, colour, keyframes, audio and export. The node graph that casts and shoots a film is driven from the same surface, so a shot it renders lands as a clip these tools can trim.",
   "author": {
     "name": "Rendr contributors",
     "url": "https://github.com/rendr-app/rendr-app"
   },
   "homepage": "https://github.com/rendr-app/rendr-app",
   "license": "AGPL-3.0-or-later",
-  "keywords": ["video", "screen recording", "editor", "timeline", "zoom"],
+  "keywords": [
+    "video",
+    "screen recording",
+    "editor",
+    "timeline",
+    "zoom",
+    "generative",
+    "film"
+  ],
   "compatibility": {
-    "platforms": ["darwin", "win32", "linux"],
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
     "runtimes": {
       "node": ">=18.0.0"
     }
@@ -23,7 +35,9 @@
     "entry_point": "server/index.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server/index.js"]
+      "args": [
+        "${__dirname}/server/index.js"
+      ]
     }
   }
 }

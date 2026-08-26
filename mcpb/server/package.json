@@ -1,0 +1,4 @@
+{
+	"_comment": "Scopes this directory to CommonJS. index.js is written with require() because an extracted .mcpb bundle has no package.json above it and Node defaults to CommonJS there. Inside this repo the root package.json says \"type\": \"module\", which reaches down here and made `npm run mcp:bridge` die on its first line. One file, three lines, and both contexts are right.",
+	"type": "commonjs"
+}
